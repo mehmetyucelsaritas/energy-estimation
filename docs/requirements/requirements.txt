@@ -1,0 +1,13 @@
+numpy==1.22.0
+pandas
+tqdm
+matplotlib
+graphviz
+networkx
+requests
+protobuf
+PyYAML
+scikit_learn==1.5.0
+flake8
+packaging
+jsonlines

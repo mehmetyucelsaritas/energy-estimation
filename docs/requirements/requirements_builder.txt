@@ -1,0 +1,6 @@
+tensorflow==2.11.1
+# torch==1.10.0
+serial
+pure-python-adb
+typing
+networkx
