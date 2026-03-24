@@ -1,0 +1,5 @@
+builtin_name: onnx_mac_m4
+package_location: /Users/mehmet/repo/nn-Meter-main/customized_backends/onnx_mac_m4
+class_module: backend
+class_name: ONNXMacBackend
+defaultConfigFile: /Users/mehmet/repo/nn-Meter-main/customized_backends/onnx_mac_m4/default_config.yaml

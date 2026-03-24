@@ -1,0 +1,249 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+"""Local ONNX Runtime backend for nn-Meter (macOS / Apple Silicon friendly)."""
+
+import json
+import logging
+import os
+import shutil
+import statistics
+import time
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
+
+import numpy as np
+
+from nn_meter.builder.backends import BaseBackend, BaseParser, BaseProfiler
+from nn_meter.builder.backend_meta.utils import Latency, ProfiledResults
+
+logging = logging.getLogger("nn-Meter")
+
+_ShapeArg = Optional[Union[Sequence[int], Dict[str, Sequence[int]]]]
+
+
+def _truthy(value) -> bool:
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    return str(value).strip().lower() in ("1", "true", "yes", "on")
+
+
+def _resolve_providers_from_config(c: Dict[str, Any]) -> List[str]:
+    """Prefer explicit EXECUTION_PROVIDERS if set; else CoreML+CPU or CPU from USE_COREML_EP."""
+    import onnxruntime as ort
+
+    explicit = c.get("EXECUTION_PROVIDERS")
+    if explicit is not None:
+        if isinstance(explicit, str):
+            return [p.strip() for p in explicit.split(",") if p.strip()]
+        if isinstance(explicit, list):
+            return [str(p).strip() for p in explicit if str(p).strip()]
+    available = set(ort.get_available_providers())
+    if _truthy(c.get("USE_COREML_EP")) and "CoreMLExecutionProvider" in available:
+        return ["CoreMLExecutionProvider", "CPUExecutionProvider"]
+    return ["CPUExecutionProvider"]
+
+
+def _numpy_dtype_for_onnx_type(ort_type: str):
+    t = (ort_type or "").lower()
+    if "float16" in t:
+        return np.float16
+    if "float" in t and "64" not in t:
+        return np.float32
+    if "double" in t or "float64" in t:
+        return np.float64
+    if "uint8" in t:
+        return np.uint8
+    if "int64" in t:
+        return np.int64
+    if "int32" in t:
+        return np.int32
+    return np.float32
+
+
+def _resolve_dim(dim: Any, dynamic_replace: int) -> int:
+    if dim is None:
+        return dynamic_replace
+    if isinstance(dim, str):
+        return int(dynamic_replace)
+    try:
+        iv = int(dim)
+        if iv <= 0:
+            return int(dynamic_replace)
+        return iv
+    except (TypeError, ValueError):
+        return int(dynamic_replace)
+
+
+def _resolve_shape(
+    shape: Sequence[Any], dynamic_replace: int
+) -> List[int]:
+    if not shape:
+        return [int(dynamic_replace)]
+    return [_resolve_dim(d, dynamic_replace) for d in shape]
+
+
+def _finalize_input_shapes(
+    session_inputs,
+    user_shape: _ShapeArg,
+    dynamic_replace: int,
+) -> Dict[str, Tuple[int, ...]]:
+    name_to_shape: Dict[str, Tuple[int, ...]] = {}
+    first_name = session_inputs[0].name if session_inputs else None
+
+    if isinstance(user_shape, dict):
+        for inp in session_inputs:
+            if inp.name in user_shape:
+                name_to_shape[inp.name] = tuple(int(x) for x in user_shape[inp.name])
+            else:
+                name_to_shape[inp.name] = tuple(
+                    _resolve_shape(inp.shape, dynamic_replace)
+                )
+        return name_to_shape
+
+    if user_shape is not None and first_name is not None:
+        name_to_shape[first_name] = tuple(int(x) for x in user_shape)
+        for inp in session_inputs[1:]:
+            name_to_shape[inp.name] = tuple(
+                _resolve_shape(inp.shape, dynamic_replace)
+            )
+        return name_to_shape
+
+    for inp in session_inputs:
+        name_to_shape[inp.name] = tuple(_resolve_shape(inp.shape, dynamic_replace))
+    return name_to_shape
+
+
+def _random_feed(
+    session,
+    name_to_shape: Dict[str, Tuple[int, ...]],
+) -> Dict[str, np.ndarray]:
+    feeds = {}
+    name_meta = {inp.name: inp for inp in session.get_inputs()}
+    for name, shape in name_to_shape.items():
+        meta = name_meta[name]
+        dtype = _numpy_dtype_for_onnx_type(meta.type)
+        if np.issubdtype(dtype, np.integer):
+            feeds[name] = np.random.randint(0, 4, size=shape, dtype=dtype)
+        else:
+            feeds[name] = np.random.randn(*shape).astype(dtype)
+    return feeds
+
+
+class ONNXRuntimeProfiler(BaseProfiler):
+    """Runs ONNX models locally with ONNX Runtime and returns a JSON latency string."""
+
+    def __init__(
+        self,
+        warmup_runs=10,
+        num_runs=50,
+        providers=None,
+        dynamic_batch_dim=1,
+        intra_op_num_threads=0,
+        inter_op_num_threads=0,
+        verbose=False,
+    ):
+        self._warmup_runs = int(warmup_runs)
+        self._num_runs = int(num_runs)
+        self._providers = providers if providers is not None else ["CPUExecutionProvider"]
+        self._dynamic_batch_dim = int(dynamic_batch_dim)
+        self._intra_op_num_threads = int(intra_op_num_threads or 0)
+        self._inter_op_num_threads = int(inter_op_num_threads or 0)
+        self._verbose = _truthy(verbose)
+
+    def profile(
+        self,
+        graph_path,
+        input_shape: _ShapeArg = None,
+        **kwargs,
+    ):
+        import onnxruntime as ort
+
+        _ = kwargs  # reserved for builder call sites
+        so = ort.SessionOptions()
+        so.log_severity_level = 3
+        if self._intra_op_num_threads > 0:
+            so.intra_op_num_threads = self._intra_op_num_threads
+        if self._inter_op_num_threads > 0:
+            so.inter_op_num_threads = self._inter_op_num_threads
+        session = ort.InferenceSession(
+            graph_path, sess_options=so, providers=list(self._providers)
+        )
+        name_to_shape = _finalize_input_shapes(
+            session.get_inputs(),
+            input_shape,
+            self._dynamic_batch_dim,
+        )
+        feed = _random_feed(session, name_to_shape)
+        output_names = [o.name for o in session.get_outputs()]
+
+        for _ in range(self._warmup_runs):
+            session.run(output_names, feed)
+
+        samples_ms: List[float] = []
+        for _ in range(self._num_runs):
+            t0 = time.perf_counter()
+            session.run(output_names, feed)
+            samples_ms.append((time.perf_counter() - t0) * 1000.0)
+
+        avg = float(statistics.mean(samples_ms))
+        std = float(statistics.stdev(samples_ms)) if len(samples_ms) > 1 else 0.0
+        payload = {"avg_ms": avg, "std_ms": std}
+        if self._verbose:
+            payload["requested_providers"] = list(self._providers)
+            payload["session_providers"] = list(session.get_providers())
+        return json.dumps(payload)
+
+
+class ONNXLatencyParser(BaseParser):
+    def __init__(self):
+        self._latency = Latency(0.0, 0.0)
+
+    def parse(self, content):
+        data = json.loads(content)
+        self._latency = Latency(float(data["avg_ms"]), float(data["std_ms"]))
+        return self
+
+    @property
+    def results(self):
+        return ProfiledResults({"latency": self._latency})
+
+
+class ONNXMacBackend(BaseBackend):
+    parser_class = ONNXLatencyParser
+    profiler_class = ONNXRuntimeProfiler
+
+    def update_configs(self):
+        super().update_configs()
+        c = self.configs or {}
+        providers = _resolve_providers_from_config(c)
+        batch = c.get("BATCH_SIZE", c.get("DYNAMIC_BATCH_DIM", 1))
+        self.profiler_kwargs.update(
+            {
+                "warmup_runs": c.get("WARMUP_RUNS", 10),
+                "num_runs": c.get("NUM_RUNS", 50),
+                "providers": providers,
+                "dynamic_batch_dim": batch,
+                "intra_op_num_threads": c.get("INTRA_OP_NUM_THREADS", 0),
+                "inter_op_num_threads": c.get("INTER_OP_NUM_THREADS", 0),
+                "verbose": c.get("VERBOSE", False),
+            }
+        )
+
+    def convert_model(self, model_path, save_path, input_shape=None):
+        os.makedirs(save_path, exist_ok=True)
+        ext = os.path.splitext(model_path)[1].lower()
+        if ext != ".onnx":
+            raise ValueError(
+                "onnx_mac_m4 backend expects a .onnx file; got "
+                f"{ext or 'no extension'} for path: {model_path}"
+            )
+        dest = os.path.join(save_path, os.path.basename(model_path))
+        shutil.copy2(model_path, dest)
+        return dest
+
+    def test_connection(self):
+        import onnxruntime as ort
+
+        _ = ort.get_available_providers()
+        logging.keyinfo("hello backend !")
