@@ -4,12 +4,22 @@ import os
 import json
 import time
 import signal
+import shutil
 import logging
 import subprocess
 from . import builder_config
 from .utils import save_profiled_results, merge_info, handle_timeout
 from nn_meter.builder.backends import connect_backend
 logging = logging.getLogger("nn-Meter")
+
+
+def clear_predictor_build_kernels():
+    """Remove generated kernel models under <WORKSPACE>/kernels after profiling."""
+    workspace_path = builder_config.get('WORKSPACE', 'predbuild')
+    kernels_dir = os.path.join(workspace_path, 'kernels')
+    if os.path.isdir(kernels_dir):
+        shutil.rmtree(kernels_dir)
+        logging.keyinfo(f"Removed generated kernel models under {kernels_dir}")
 
 
 def convert_models(backend, models, mode = 'predbuild', broken_point_mode = False, model_save_path = None):
@@ -197,6 +207,7 @@ def sample_and_profile_kernel_data(kernel_type, sample_num, backend, sampling_mo
     # connect to backend, run models and get latency
     backend = connect_backend(backend_name=backend)
     profiled_results = profile_models(backend, models, mode='predbuild', metrics=metrics, save_name=f"profiled_{kernel_type}.json")
+    clear_predictor_build_kernels()
     return profiled_results
 
 
