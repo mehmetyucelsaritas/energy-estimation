@@ -151,18 +151,34 @@ def save_model(model, model_path, implement):
     elif implement == 'torch':
         import torch
         from nn_meter.builder.nn_modules.torch_networks.utils import get_inputs_by_shapes
+
+        m = model['model']
+        m.eval()
+        inp = get_inputs_by_shapes(model['shapes'])
+        if isinstance(inp, list):
+            export_args = (inp,)
+            input_names = [f"input_{i}" for i in range(len(inp))]
+        else:
+            export_args = (inp,)
+            input_names = ["input"]
+        with torch.no_grad():
+            out = m(inp) if isinstance(inp, list) else m(inp)
+        if isinstance(out, (tuple, list)):
+            output_names = [f"output_{i}" for i in range(len(out))]
+        else:
+            output_names = ["output"]
         torch.onnx.export(
-            model['model'],
-            get_inputs_by_shapes(model['shapes']),
-            model_path + '.onnx',
-            input_names=['input'],
-            output_names=['output'],
+            m,
+            export_args,
+            model_path + ".onnx",
+            input_names=input_names,
+            output_names=output_names,
             verbose=False,
             export_params=True,
             opset_version=12,
             do_constant_folding=True,
         )
-        return model_path + '.onnx'
+        return model_path + ".onnx"
 
     else:
         import pdb; pdb.set_trace()

@@ -102,6 +102,22 @@ def _finalize_input_shapes(
         return name_to_shape
 
     if user_shape is not None and first_name is not None:
+        # nn-meter ruletest uses shapes like [[C,H,W]] or [[C,H,W],[C,H,W]] for multi-input
+        if (
+            len(user_shape) > 0
+            and isinstance(user_shape[0], (list, tuple))
+            and not isinstance(user_shape[0], (str, bytes))
+        ):
+            for i, inp in enumerate(session_inputs):
+                if i < len(user_shape):
+                    name_to_shape[inp.name] = tuple(
+                        int(x) for x in user_shape[i]
+                    )
+                else:
+                    name_to_shape[inp.name] = tuple(
+                        _resolve_shape(inp.shape, dynamic_replace)
+                    )
+            return name_to_shape
         name_to_shape[first_name] = tuple(int(x) for x in user_shape)
         for inp in session_inputs[1:]:
             name_to_shape[inp.name] = tuple(
@@ -112,6 +128,29 @@ def _finalize_input_shapes(
     for inp in session_inputs:
         name_to_shape[inp.name] = tuple(_resolve_shape(inp.shape, dynamic_replace))
     return name_to_shape
+
+
+def _match_onnx_input_rank(
+    session,
+    name_to_shape: Dict[str, Tuple[int, ...]],
+    batch_dim: int,
+) -> Dict[str, Tuple[int, ...]]:
+    """Prepend batch when testcase shapes omit it (nn-meter uses CHW; ORT export uses NCHW)."""
+    out: Dict[str, Tuple[int, ...]] = {}
+    for inp in session.get_inputs():
+        sh = list(name_to_shape[inp.name])
+        spec = inp.shape
+        if spec is None:
+            out[inp.name] = tuple(sh)
+            continue
+        n_ort = len(spec)
+        n_sh = len(sh)
+        if n_sh + 1 == n_ort:
+            sh = [batch_dim] + sh
+        elif n_sh > n_ort:
+            sh = sh[-n_ort:]
+        out[inp.name] = tuple(int(x) for x in sh)
+    return out
 
 
 def _random_feed(
@@ -173,6 +212,9 @@ class ONNXRuntimeProfiler(BaseProfiler):
             session.get_inputs(),
             input_shape,
             self._dynamic_batch_dim,
+        )
+        name_to_shape = _match_onnx_input_rank(
+            session, name_to_shape, self._dynamic_batch_dim
         )
         feed = _random_feed(session, name_to_shape)
         output_names = [o.name for o in session.get_outputs()]
@@ -239,7 +281,8 @@ class ONNXMacBackend(BaseBackend):
                 f"{ext or 'no extension'} for path: {model_path}"
             )
         dest = os.path.join(save_path, os.path.basename(model_path))
-        shutil.copy2(model_path, dest)
+        if os.path.abspath(model_path) != os.path.abspath(dest):
+            shutil.copy2(model_path, dest)
         return dest
 
     def test_connection(self):
