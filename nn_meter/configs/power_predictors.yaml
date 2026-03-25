@@ -1,0 +1,4 @@
+# Power (average watts during inference) kernel predictors — same schema as predictors.yaml.
+# Populate after training; each entry needs name, version, kernel_predictors, and either
+# download (URL) or package_location (local directory with *.pkl + fusion_rules.json).
+[]

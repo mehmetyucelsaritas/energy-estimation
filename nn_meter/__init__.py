@@ -12,7 +12,10 @@ from functools import partial, partialmethod
 from .predictor import (
     nnMeterPredictor,
     load_latency_predictor,
-    list_latency_predictors
+    list_latency_predictors,
+    nnMeterPowerPredictor,
+    load_power_predictor,
+    list_power_predictors,
 )
 from .ir_converter import (
     model_file_to_graph,
