@@ -81,7 +81,8 @@ def convert_models(backend, models, mode = 'predbuild', broken_point_mode = Fals
 
 
 def profile_models(backend, models, mode = 'ruletest', metrics = ["latency"], save_name = "profiled_results.json", have_converted = False,
-                   log_frequency = 50, broken_point_mode = False, time_threshold = 300, is_pixel6 = None, model_save_path = None, **kwargs):
+                   log_frequency = 50, broken_point_mode = False, time_threshold = 300, is_pixel6 = None,
+                   model_save_path = None, result_subdir = "", **kwargs):
     """ run models with given backend and return latency of testcase models
 
     @params:
@@ -117,12 +118,11 @@ def profile_models(backend, models, mode = 'ruletest', metrics = ["latency"], sa
             models = json.load(fp)
 
     workspace_path = builder_config.get('WORKSPACE', mode)
-    res_save_path = os.path.join(workspace_path, "results")
+    res_save_path = os.path.join(workspace_path, "results", result_subdir) if result_subdir else os.path.join(workspace_path, "results")
     os.makedirs(res_save_path, exist_ok=True)
     info_save_path = os.path.join(res_save_path, save_name)
 
-    # in broken point model, if the output file `<workspace>/<mode-folder>/results/<save-name>` exists,
-    # load the existing latency and skip these model in profiling
+    # in broken point mode, if the output file exists, load existing metrics and skip finished models
     if broken_point_mode and os.path.isfile(info_save_path):
         from nn_meter.builder.backend_meta.utils import read_profiled_results
         with open(info_save_path, 'r') as fp:
@@ -142,8 +142,19 @@ def profile_models(backend, models, mode = 'ruletest', metrics = ["latency"], sa
     logging.info("Profiling ...")
     for module in models.values():
         for id, model in module.items():
-            if broken_point_mode and 'latency' in model and model['latency'].avg != 0:
-                continue
+            if broken_point_mode:
+                metric_ready = True
+                for metric in metrics:
+                    if metric not in model:
+                        metric_ready = False
+                        break
+                    if metric == "latency":
+                        latency_metric = model[metric]
+                        if not hasattr(latency_metric, "avg") or latency_metric.avg == 0:
+                            metric_ready = False
+                            break
+                if metric_ready:
+                    continue
             if have_converted: # the models have been converted for the backend
                 try:
                     model_path = model['converted_model']
@@ -195,25 +206,33 @@ def profile_models(backend, models, mode = 'ruletest', metrics = ["latency"], sa
 
 
 def sample_and_profile_kernel_data(kernel_type, sample_num, backend, sampling_mode = 'prior', configs = None, mark = '', detail = True,
-                                   metrics = ["latency"], **kwargs):
+                                   metrics = ["latency"], result_subdir = "", **kwargs):
     ''' sample kernel configs and profile kernel model based on configs
     '''
     from nn_meter.builder.kernel_predictor_builder import generate_config_sample
 
     # sample configs for kernel and generate models
     models = generate_config_sample(kernel_type, sample_num, mark=mark, 
-                                     sampling_mode=sampling_mode, configs=configs)
+                                    sampling_mode=sampling_mode, configs=configs, result_subdir=result_subdir)
 
     # connect to backend, run models and get latency
     backend = connect_backend(backend_name=backend)
-    profiled_results = profile_models(backend, models, mode='predbuild', metrics=metrics, save_name=f"profiled_{kernel_type}.json")
+    profile_suffix = f"_{result_subdir}" if result_subdir else ""
+    profiled_results = profile_models(
+        backend,
+        models,
+        mode='predbuild',
+        metrics=metrics,
+        save_name=f"profiled_{kernel_type}{profile_suffix}.json",
+        result_subdir=result_subdir,
+    )
     clear_predictor_build_kernels()
     return profiled_results
 
 
 def build_predictor_for_kernel(kernel_type, backend, init_sample_num = 1000, finegrained_sample_num = 10,
                                iteration = 5, error_threshold = 0.1, predict_label = "latency", mark = "",
-                               metrics = ["latency"]):
+                               metrics = ["latency"], result_subdir = ""):
     """ 
     Build latency predictor for given kernel. This method contains three main steps:
     1. sample kernel configs and profile kernel model based on configs;
@@ -241,6 +260,7 @@ def build_predictor_for_kernel(kernel_type, backend, init_sample_num = 1000, fin
     """
     from nn_meter.builder.kernel_predictor_builder import build_predictor_by_data
     workspace_path = builder_config.get('WORKSPACE', 'predbuild')
+    predictor_result_path = os.path.join(workspace_path, "results", result_subdir) if result_subdir else os.path.join(workspace_path, "results")
     mark = mark if mark == "" else "_" + mark
 
     # init predictor builder with prior data sampler
@@ -251,11 +271,12 @@ def build_predictor_for_kernel(kernel_type, backend, init_sample_num = 1000, fin
         sampling_mode='prior',
         mark=f'prior{mark}',
         metrics=metrics,
+        result_subdir=result_subdir,
     )
 
     # use current sampled data to build regression model, and locate data with large errors in testset
     predictor, acc10, error_configs = build_predictor_by_data(kernel_type, kernel_data, backend, error_threshold=error_threshold, mark=f'prior{mark}',
-                                                              save_path=os.path.join(workspace_path, "results"), predict_label=predict_label)
+                                                              save_path=predictor_result_path, predict_label=predict_label)
     logging.keyinfo(f'Iteration 0: acc10 {acc10}, error_configs number: {len(error_configs)}')
 
     for i in range(1, iteration):
@@ -268,12 +289,13 @@ def build_predictor_for_kernel(kernel_type, backend, init_sample_num = 1000, fin
             configs=error_configs,
             mark=f'finegrained{i}{mark}',
             metrics=metrics,
+            result_subdir=result_subdir,
         )
 
         # merge finegrained data with previous data and build new regression model
         kernel_data = merge_info(new_info=new_kernel_data, prev_info=kernel_data)
         predictor, acc10, error_configs = build_predictor_by_data(kernel_type, kernel_data, backend, error_threshold=error_threshold, mark=f'finegrained{i}{mark}',
-                                                                  save_path=os.path.join(workspace_path, "results"), predict_label=predict_label)
+                                                                  save_path=predictor_result_path, predict_label=predict_label)
         logging.keyinfo(f'Iteration {i}: acc10 {acc10}, error_configs number: {len(error_configs)}')
 
     return predictor, kernel_data
@@ -293,7 +315,7 @@ def build_adaptive_predictor_by_data(kernel_type, kernel_data, backend = None, f
     from nn_meter.builder.kernel_predictor_builder import build_predictor_by_data, collect_kernel_data
     _, _, error_configs = build_predictor_by_data(kernel_type, kernel_data, backend = backend, error_threshold=error_threshold, save_path=None, predict_label=predict_label)
     new_kernel_data = sample_and_profile_kernel_data(kernel_type, finegrained_sample_num, backend,
-                                                     sampling_mode='finegrained', configs=error_configs, mark=mark)
+                                                     sampling_mode='finegrained', configs=error_configs, mark=mark, metrics=[predict_label])
 
     # merge finegrained data with previous data and build new regression model
     kernel_data = merge_info(new_info=new_kernel_data, prev_info=collect_kernel_data(kernel_data))
@@ -326,6 +348,7 @@ def build_latency_predictor(backend):
             iteration = iteration,
             error_threshold = error_threshold,
             metrics = ["latency"],
+            result_subdir="latency",
         )
 
 
@@ -346,4 +369,5 @@ def build_power_predictor(backend):
             error_threshold=error_threshold,
             predict_label="power",
             metrics=["power"],
+            result_subdir="power",
             )
