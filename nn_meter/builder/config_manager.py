@@ -9,6 +9,7 @@ __backend_tflite_cfg_filename__ = 'backend_tflite_config.yaml'
 __backend_openvino_cfg_filename__ = 'backend_openvino_config.yaml'
 __ruletest_cfg_filename__ = 'ruletest_config.yaml'
 __predbuild_cfg_filename__ = 'predictorbuild_config.yaml'
+__predbuild_power_cfg_filename__ = 'predictorbuild_power_config.yaml'
 
 
 def copy_to_workspace(backend_type, workspace_path, backendConfigFile = None):
@@ -32,10 +33,27 @@ def copy_to_workspace(backend_type, workspace_path, backendConfigFile = None):
     copyfile(
         pkg_resources.resource_filename(".".join(__name__.split('.')[:-2]), f'configs/builder/fusion_rule_tester/' + __ruletest_cfg_filename__), 
         os.path.join(os.path.join(workspace_path, 'configs'), 'ruletest_config.yaml'))
-    # predictor builder config
+    # predictor builder config (latency)
     copyfile(
         pkg_resources.resource_filename(".".join(__name__.split('.')[:-2]), f'configs/builder/predictor_builder/' + __predbuild_cfg_filename__), 
         os.path.join(os.path.join(workspace_path, 'configs'), 'predictorbuild_config.yaml'))
+    # predictor builder config (power); independent KERNELS / sampling from latency
+    copyfile(
+        pkg_resources.resource_filename(".".join(__name__.split('.')[:-2]), f'configs/builder/predictor_builder/' + __predbuild_power_cfg_filename__),
+        os.path.join(os.path.join(workspace_path, 'configs'), __predbuild_power_cfg_filename__))
+
+
+def _ensure_predictorbuild_power_config(workspace_path):
+    """Create predictorbuild_power_config.yaml from package defaults if missing (older workspaces)."""
+    power_path = os.path.join(workspace_path, 'configs', __predbuild_power_cfg_filename__)
+    if not os.path.isfile(power_path):
+        copyfile(
+            pkg_resources.resource_filename(
+                ".".join(__name__.split('.')[:-2]),
+                'configs/builder/predictor_builder/' + __predbuild_power_cfg_filename__,
+            ),
+            power_path,
+        )
 
 
 def load_config_file(workspace_path):
@@ -45,6 +63,7 @@ def load_config_file(workspace_path):
     backend_filepath = os.path.join(workspace_path, "configs", 'backend_config.yaml')
     ruletest_filepath = os.path.join(workspace_path, "configs", 'ruletest_config.yaml')
     predictorbuild_filepath = os.path.join(workspace_path, "configs", 'predictorbuild_config.yaml')
+    predictorbuild_power_filepath = os.path.join(workspace_path, "configs", __predbuild_power_cfg_filename__)
     try:
         try:
             with open(backend_filepath) as fp:
@@ -55,7 +74,10 @@ def load_config_file(workspace_path):
             ruletest = yaml.load(fp, yaml.FullLoader)
         with open(predictorbuild_filepath) as fp:
             predictorbuild = yaml.load(fp, yaml.FullLoader)
-        return backend, ruletest, predictorbuild
+        _ensure_predictorbuild_power_config(workspace_path)
+        with open(predictorbuild_power_filepath) as fp:
+            predictorbuild_power = yaml.load(fp, yaml.FullLoader)
+        return backend, ruletest, predictorbuild, predictorbuild_power
     except:
         raise FileNotFoundError(f"config file in {workspace_path} not found, please create the workspace first." \
                                 "Docs: https://github.com/microsoft/nn-Meter/blob/main/docs/builder/overview.md#-create-workspace-")
@@ -96,11 +118,14 @@ class ConfigManager(ConfigData):
         self._load_from_config_file(workspace_path)
     
     def _load_from_config_file(self, workspace_path):
-        backend, ruletest, predbuild = load_config_file(workspace_path)
+        backend, ruletest, predbuild, predbuild_power = load_config_file(workspace_path)
         self.set_module(backend, 'backend')
         self.set_module(ruletest, 'ruletest')
         self.set_module(predbuild, 'predbuild')
+        self.set_module(predbuild_power, 'predbuild_power')
         self.set('WORKSPACE', os.path.join(self.workspace_path, "fusion_rule_test"), 'ruletest')
-        self.set('WORKSPACE', os.path.join(self.workspace_path, "predictor_build"), 'predbuild')
+        predictor_build = os.path.join(self.workspace_path, "predictor_build")
+        self.set('WORKSPACE', predictor_build, 'predbuild')
+        self.set('WORKSPACE', predictor_build, 'predbuild_power')
 
 builder_config = ConfigManager()

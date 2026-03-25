@@ -82,7 +82,7 @@ def convert_models(backend, models, mode = 'predbuild', broken_point_mode = Fals
 
 def profile_models(backend, models, mode = 'ruletest', metrics = ["latency"], save_name = "profiled_results.json", have_converted = False,
                    log_frequency = 50, broken_point_mode = False, time_threshold = 300, is_pixel6 = None,
-                   model_save_path = None, result_subdir = "", **kwargs):
+                   model_save_path = None, result_subdir = "", predbuild_config_module = 'predbuild', **kwargs):
     """ run models with given backend and return latency of testcase models
 
     @params:
@@ -109,6 +109,9 @@ def profile_models(backend, models, mode = 'ruletest', metrics = ["latency"], sa
 
     model_save_path (str or None): path to save converted models, if not set, the converted model will be placed in
         the same directory as the original model.
+
+    predbuild_config_module (str): when mode is 'predbuild', DETAIL is read from this builder_config module
+        (e.g. 'predbuild' for latency, 'predbuild_power' for power).
 
     **kwargs: arguments for profiler, such as `taskset` and `close_xnnpack` in TFLite profiler
     """
@@ -137,7 +140,8 @@ def profile_models(backend, models, mode = 'ruletest', metrics = ["latency"], sa
     # profile models and get metric results
     count = 0    
     error_save_path = os.path.join(res_save_path, "profile_error.log")
-    detail = builder_config.get('DETAIL', mode)
+    detail_module = predbuild_config_module if mode == 'predbuild' else mode
+    detail = builder_config.get('DETAIL', detail_module)
     save_name = save_name or "profiled_results.json"
     logging.info("Profiling ...")
     for module in models.values():
@@ -206,14 +210,15 @@ def profile_models(backend, models, mode = 'ruletest', metrics = ["latency"], sa
 
 
 def sample_and_profile_kernel_data(kernel_type, sample_num, backend, sampling_mode = 'prior', configs = None, mark = '', detail = True,
-                                   metrics = ["latency"], result_subdir = "", **kwargs):
+                                   metrics = ["latency"], result_subdir = "", predbuild_config_module = 'predbuild', **kwargs):
     ''' sample kernel configs and profile kernel model based on configs
     '''
     from nn_meter.builder.kernel_predictor_builder import generate_config_sample
 
     # sample configs for kernel and generate models
-    models = generate_config_sample(kernel_type, sample_num, mark=mark, 
-                                    sampling_mode=sampling_mode, configs=configs, result_subdir=result_subdir)
+    models = generate_config_sample(kernel_type, sample_num, mark=mark,
+                                    sampling_mode=sampling_mode, configs=configs, result_subdir=result_subdir,
+                                    config_module=predbuild_config_module)
 
     # connect to backend, run models and get latency
     backend = connect_backend(backend_name=backend)
@@ -225,6 +230,7 @@ def sample_and_profile_kernel_data(kernel_type, sample_num, backend, sampling_mo
         metrics=metrics,
         save_name=f"profiled_{kernel_type}{profile_suffix}.json",
         result_subdir=result_subdir,
+        predbuild_config_module=predbuild_config_module,
     )
     clear_predictor_build_kernels()
     return profiled_results
@@ -232,7 +238,7 @@ def sample_and_profile_kernel_data(kernel_type, sample_num, backend, sampling_mo
 
 def build_predictor_for_kernel(kernel_type, backend, init_sample_num = 1000, finegrained_sample_num = 10,
                                iteration = 5, error_threshold = 0.1, predict_label = "latency", mark = "",
-                               metrics = ["latency"], result_subdir = ""):
+                               metrics = ["latency"], result_subdir = "", predbuild_config_module = 'predbuild'):
     """ 
     Build latency predictor for given kernel. This method contains three main steps:
     1. sample kernel configs and profile kernel model based on configs;
@@ -256,10 +262,12 @@ def build_predictor_for_kernel(kernel_type, backend, init_sample_num = 1000, fin
     error_threshold (float, optional): the threshold of large error. Defaults to 0.1.
 
     predict_label (str): the predicting label to build kernel predictor. Defaults to "latency"
- 
+
+    predbuild_config_module (str): builder_config module for sampling/profiling options (``predbuild`` vs ``predbuild_power``).
+
     """
     from nn_meter.builder.kernel_predictor_builder import build_predictor_by_data
-    workspace_path = builder_config.get('WORKSPACE', 'predbuild')
+    workspace_path = builder_config.get('WORKSPACE', predbuild_config_module)
     predictor_result_path = os.path.join(workspace_path, "results", result_subdir) if result_subdir else os.path.join(workspace_path, "results")
     mark = mark if mark == "" else "_" + mark
 
@@ -272,6 +280,7 @@ def build_predictor_for_kernel(kernel_type, backend, init_sample_num = 1000, fin
         mark=f'prior{mark}',
         metrics=metrics,
         result_subdir=result_subdir,
+        predbuild_config_module=predbuild_config_module,
     )
 
     # use current sampled data to build regression model, and locate data with large errors in testset
@@ -290,6 +299,7 @@ def build_predictor_for_kernel(kernel_type, backend, init_sample_num = 1000, fin
             mark=f'finegrained{i}{mark}',
             metrics=metrics,
             result_subdir=result_subdir,
+            predbuild_config_module=predbuild_config_module,
         )
 
         # merge finegrained data with previous data and build new regression model
@@ -326,8 +336,8 @@ def build_adaptive_predictor_by_data(kernel_type, kernel_data, backend = None, f
 
 
 def build_latency_predictor(backend):
-    """ 
-    Build latency predictor for all kernel in `<workspace-path>/configs/predictorbuild_config.yaml`
+    """
+    Build latency predictor for all kernels in `<workspace-path>/configs/predictorbuild_config.yaml`
 
     @params
 
@@ -342,19 +352,20 @@ def build_latency_predictor(backend):
         iteration = kernels[kernel_type]["ITERATION"]
         error_threshold = kernels[kernel_type]["ERROR_THRESHOLD"]
         build_predictor_for_kernel(
-            kernel_type, backend, 
+            kernel_type, backend,
             init_sample_num = init_sample_num,
             finegrained_sample_num = finegrained_sample_num,
             iteration = iteration,
             error_threshold = error_threshold,
             metrics = ["latency"],
             result_subdir="latency",
+            predbuild_config_module='predbuild',
         )
 
 
 def build_power_predictor(backend):
-    """Build power predictor for all kernels in predictor build config."""
-    kernels = builder_config.get("KERNELS", 'predbuild')
+    """Build power predictor for all kernels in `<workspace-path>/configs/predictorbuild_power_config.yaml`."""
+    kernels = builder_config.get("KERNELS", 'predbuild_power')
 
     for kernel_type in kernels:
         init_sample_num = kernels[kernel_type]["INIT_SAMPLE_NUM"]
@@ -370,4 +381,5 @@ def build_power_predictor(backend):
             predict_label="power",
             metrics=["power"],
             result_subdir="power",
+            predbuild_config_module='predbuild_power',
             )

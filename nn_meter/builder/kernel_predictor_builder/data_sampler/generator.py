@@ -12,17 +12,18 @@ logging = logging.getLogger("nn-Meter")
 
 
 class KernelGenerator:
-    def __init__(self, kernel_type, sample_num, mark = "", result_subdir = ""):
+    def __init__(self, kernel_type, sample_num, mark="", result_subdir="", config_module='predbuild'):
         self.kernel_type = kernel_type
         self.sample_num = sample_num
-        self.workspace_path = builder_config.get('WORKSPACE', 'predbuild')
+        self.config_module = config_module
+        self.workspace_path = builder_config.get('WORKSPACE', self.config_module)
         self.case_save_path = os.path.join(self.workspace_path, 'kernels')
         self.result_subdir = result_subdir
         self.result_save_path = os.path.join(self.workspace_path, "results", result_subdir) if result_subdir else os.path.join(self.workspace_path, "results")
         self.kernel_info = {kernel_type: {}}
         self.kernels = self.kernel_info[self.kernel_type]
-        self.implement = builder_config.get('IMPLEMENT', 'predbuild')
-        self.batch_size = builder_config.get('BATCH_SIZE', 'predbuild')
+        self.implement = builder_config.get('IMPLEMENT', self.config_module)
+        self.batch_size = builder_config.get('BATCH_SIZE', self.config_module)
         self.model_suffix = "" if self.implement == 'tensorflow' else ".onnx"
         self.mark = mark
         os.makedirs(self.case_save_path, exist_ok=True)
@@ -84,7 +85,8 @@ class KernelGenerator:
         return self.kernel_info
 
 
-def generate_config_sample(kernel_type, sample_num, mark = '', sampling_mode = 'prior', configs = None, result_subdir = ""):
+def generate_config_sample(kernel_type, sample_num, mark='', sampling_mode='prior', configs=None, result_subdir="",
+                           config_module='predbuild'):
     """ Generate config sample and return sampled configs.
 
     @params
@@ -100,8 +102,10 @@ def generate_config_sample(kernel_type, sample_num, mark = '', sampling_mode = '
     configs (list, optional): is required when the sampling_mode=='finegrained'. The fingrained samples will based on the config 
         in `configs`. Defaults to None.
 
+    config_module (str): builder_config module for WORKSPACE / IMPLEMENT / BATCH_SIZE (e.g. ``predbuild`` or ``predbuild_power``).
+
     """
-    generator = KernelGenerator(kernel_type, sample_num, mark=mark, result_subdir=result_subdir)
+    generator = KernelGenerator(kernel_type, sample_num, mark=mark, result_subdir=result_subdir, config_module=config_module)
     kernels_info = generator.run(sampling_mode=sampling_mode, configs=configs)
 
     return kernels_info
