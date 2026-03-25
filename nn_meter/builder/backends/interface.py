@@ -98,7 +98,9 @@ class BaseBackend:
         metrics: a list of required metrics name. Defaults to ['latency']
         
         """
-        return self.parser.parse(self.profiler.profile(converted_model, **kwargs)).results.get(metrics)
+        return self.parser.parse(
+            self.profiler.profile(converted_model, metrics=metrics, **kwargs)
+        ).results.get(metrics)
 
     def profile_model_file(self, model_path, save_path, input_shape = None, metrics = ['latency'], **kwargs):
         """ load model by model file path, convert model file, and run ``self.profile()``

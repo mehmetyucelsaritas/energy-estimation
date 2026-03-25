@@ -170,7 +170,12 @@ def _random_feed(
 
 
 class ONNXRuntimeProfiler(BaseProfiler):
-    """Runs ONNX models locally with ONNX Runtime and returns a JSON latency string."""
+    """Runs ONNX models locally with ONNX Runtime and returns JSON metrics.
+
+    Emits:
+      - avg_ms, std_ms
+      - avg_power_w (best-effort, via CodeCarbon) when available
+    """
 
     def __init__(
         self,
@@ -199,6 +204,10 @@ class ONNXRuntimeProfiler(BaseProfiler):
         import onnxruntime as ort
 
         _ = kwargs  # reserved for builder call sites
+        requested_metrics = kwargs.get("metrics", ["latency"])
+        if not isinstance(requested_metrics, list):
+            requested_metrics = [requested_metrics]
+        power_requested = "power" in requested_metrics
         so = ort.SessionOptions()
         so.log_severity_level = 3
         if self._intra_op_num_threads > 0:
@@ -222,15 +231,64 @@ class ONNXRuntimeProfiler(BaseProfiler):
         for _ in range(self._warmup_runs):
             session.run(output_names, feed)
 
+        # Timed runs. We optionally track energy for the whole window and
+        # derive average power as P_avg = E / t.
         samples_ms: List[float] = []
-        for _ in range(self._num_runs):
-            t0 = time.perf_counter()
-            session.run(output_names, feed)
-            samples_ms.append((time.perf_counter() - t0) * 1000.0)
+        avg_power_w: Optional[float] = None
+
+        tracker = None
+        if power_requested:
+            try:
+                from codecarbon import EmissionsTracker  # type: ignore
+
+                # Avoid filesystem writes in tight loops; still may create a run in some versions.
+                # On macOS, CodeCarbon may try to call powermetrics which can trigger an
+                # interactive sudo password prompt and stall profiling. Prefer CPU-load mode.
+                force_cpu_load = hasattr(os, "uname") and os.uname().sysname.lower() == "darwin"
+                tracker_kwargs: Dict[str, Any] = {
+                    "save_to_file": False,
+                    "log_level": "error",
+                }
+                if force_cpu_load:
+                    tracker_kwargs["force_mode_cpu_load"] = True
+                tracker = EmissionsTracker(**tracker_kwargs)
+                tracker.start()
+            except Exception as e:
+                if self._verbose:
+                    logging.warning(f"CodeCarbon unavailable; skipping power metric: {e}")
+                tracker = None
+
+        t_window0 = time.perf_counter()
+        try:
+            for _ in range(self._num_runs):
+                t0 = time.perf_counter()
+                session.run(output_names, feed)
+                samples_ms.append((time.perf_counter() - t0) * 1000.0)
+        finally:
+            t_window_s = max(time.perf_counter() - t_window0, 1e-12)
+            if tracker is not None:
+                try:
+                    _ = tracker.stop()  # returns kgCO2e; we use energy if present in final data
+                    emissions_data = getattr(tracker, "final_emissions_data", None)
+                    if emissions_data is None:
+                        # Some versions expose last_emissions_data.
+                        emissions_data = getattr(tracker, "_last_emissions_data", None)
+
+                    energy_kwh = None
+                    if emissions_data is not None:
+                        energy_kwh = getattr(emissions_data, "energy_consumed", None)
+                    if energy_kwh is not None:
+                        energy_j = float(energy_kwh) * 3_600_000.0
+                        avg_power_w = float(energy_j / t_window_s)
+                except Exception as e:
+                    if self._verbose:
+                        logging.warning(f"CodeCarbon measurement failed; skipping power: {e}")
 
         avg = float(statistics.mean(samples_ms))
         std = float(statistics.stdev(samples_ms)) if len(samples_ms) > 1 else 0.0
-        payload = {"avg_ms": avg, "std_ms": std}
+        payload: Dict[str, Any] = {"avg_ms": avg, "std_ms": std}
+        if avg_power_w is not None:
+            payload["avg_power_w"] = avg_power_w
         if self._verbose:
             payload["requested_providers"] = list(self._providers)
             payload["session_providers"] = list(session.get_providers())
@@ -240,15 +298,21 @@ class ONNXRuntimeProfiler(BaseProfiler):
 class ONNXLatencyParser(BaseParser):
     def __init__(self):
         self._latency = Latency(0.0, 0.0)
+        self._power_w: Optional[float] = None
 
     def parse(self, content):
         data = json.loads(content)
         self._latency = Latency(float(data["avg_ms"]), float(data["std_ms"]))
+        if "avg_power_w" in data and data["avg_power_w"] is not None:
+            self._power_w = float(data["avg_power_w"])
         return self
 
     @property
     def results(self):
-        return ProfiledResults({"latency": self._latency})
+        out: Dict[str, Any] = {"latency": self._latency}
+        if self._power_w is not None:
+            out["power"] = self._power_w
+        return ProfiledResults(out)
 
 
 class ONNXMacBackend(BaseBackend):
