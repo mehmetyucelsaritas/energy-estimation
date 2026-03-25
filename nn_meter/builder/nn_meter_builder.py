@@ -143,6 +143,14 @@ def profile_models(backend, models, mode = 'ruletest', metrics = ["latency"], sa
     detail_module = predbuild_config_module if mode == 'predbuild' else mode
     detail = builder_config.get('DETAIL', detail_module)
     save_name = save_name or "profiled_results.json"
+    # Optional pause after each successful profile (legacy 0.2s for device backends). Set INTER_MODEL_SLEEP_S in backend_config.yaml (e.g. 0 for local ORT).
+    inter_model_sleep_s = 0.2
+    try:
+        _bc = builder_config.get_module("backend")
+        if isinstance(_bc, dict) and _bc.get("INTER_MODEL_SLEEP_S") is not None:
+            inter_model_sleep_s = max(0.0, float(_bc["INTER_MODEL_SLEEP_S"]))
+    except (ValueError, TypeError):
+        inter_model_sleep_s = 0.2
     logging.info("Profiling ...")
     for module in models.values():
         for id, model in module.items():
@@ -167,7 +175,8 @@ def profile_models(backend, models, mode = 'ruletest', metrics = ["latency"], sa
                     signal.alarm(0)
                     for metric in metrics:
                         model[metric] = profiled_res[metric]
-                    time.sleep(0.2)
+                    if inter_model_sleep_s > 0:
+                        time.sleep(inter_model_sleep_s)
                     count += 1
                 except Exception as e:
                     open(error_save_path, 'a').write(f"{id}: {e}\n")
@@ -179,7 +188,8 @@ def profile_models(backend, models, mode = 'ruletest', metrics = ["latency"], sa
                     signal.alarm(0)
                     for metric in metrics:
                         model[metric] = profiled_res[metric]
-                    time.sleep(0.2)
+                    if inter_model_sleep_s > 0:
+                        time.sleep(inter_model_sleep_s)
                     count += 1
                 except Exception as e:
                     open(error_save_path, 'a').write(f"{id}: {e}\n")

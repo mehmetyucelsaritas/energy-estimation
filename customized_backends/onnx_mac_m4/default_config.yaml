@@ -17,6 +17,8 @@ INTER_OP_NUM_THREADS: 0     # 0 => ORT default
 # Benchmark settings (inference timing)
 WARMUP_RUNS: 10
 NUM_RUNS: 50
+# Optional; omit for builder default 0.2s. Local ORT profiling usually does not need a pause between models.
+INTER_MODEL_SLEEP_S: 0
 BATCH_SIZE: 1
 
 # If true, include ORT provider list in profiler output

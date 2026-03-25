@@ -4,10 +4,10 @@
 
 import json
 import logging
+import time
 import os
 import shutil
 import statistics
-import time
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
