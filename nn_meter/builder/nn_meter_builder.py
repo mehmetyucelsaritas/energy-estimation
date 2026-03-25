@@ -212,7 +212,8 @@ def sample_and_profile_kernel_data(kernel_type, sample_num, backend, sampling_mo
 
 
 def build_predictor_for_kernel(kernel_type, backend, init_sample_num = 1000, finegrained_sample_num = 10,
-                               iteration = 5, error_threshold = 0.1, predict_label = "latency", mark = ""):
+                               iteration = 5, error_threshold = 0.1, predict_label = "latency", mark = "",
+                               metrics = ["latency"]):
     """ 
     Build latency predictor for given kernel. This method contains three main steps:
     1. sample kernel configs and profile kernel model based on configs;
@@ -243,7 +244,14 @@ def build_predictor_for_kernel(kernel_type, backend, init_sample_num = 1000, fin
     mark = mark if mark == "" else "_" + mark
 
     # init predictor builder with prior data sampler
-    kernel_data = sample_and_profile_kernel_data(kernel_type, init_sample_num, backend, sampling_mode='prior', mark=f'prior{mark}')
+    kernel_data = sample_and_profile_kernel_data(
+        kernel_type,
+        init_sample_num,
+        backend,
+        sampling_mode='prior',
+        mark=f'prior{mark}',
+        metrics=metrics,
+    )
 
     # use current sampled data to build regression model, and locate data with large errors in testset
     predictor, acc10, error_configs = build_predictor_by_data(kernel_type, kernel_data, backend, error_threshold=error_threshold, mark=f'prior{mark}',
@@ -252,8 +260,15 @@ def build_predictor_for_kernel(kernel_type, backend, init_sample_num = 1000, fin
 
     for i in range(1, iteration):
         # finegrained sampling and profiling for large error data
-        new_kernel_data = sample_and_profile_kernel_data(kernel_type, finegrained_sample_num, backend,
-                                                         sampling_mode='finegrained', configs=error_configs, mark=f'finegrained{i}{mark}')
+        new_kernel_data = sample_and_profile_kernel_data(
+            kernel_type,
+            finegrained_sample_num,
+            backend,
+            sampling_mode='finegrained',
+            configs=error_configs,
+            mark=f'finegrained{i}{mark}',
+            metrics=metrics,
+        )
 
         # merge finegrained data with previous data and build new regression model
         kernel_data = merge_info(new_info=new_kernel_data, prev_info=kernel_data)
@@ -309,5 +324,26 @@ def build_latency_predictor(backend):
             init_sample_num = init_sample_num,
             finegrained_sample_num = finegrained_sample_num,
             iteration = iteration,
-            error_threshold = error_threshold
+            error_threshold = error_threshold,
+            metrics = ["latency"],
+        )
+
+
+def build_power_predictor(backend):
+    """Build power predictor for all kernels in predictor build config."""
+    kernels = builder_config.get("KERNELS", 'predbuild')
+
+    for kernel_type in kernels:
+        init_sample_num = kernels[kernel_type]["INIT_SAMPLE_NUM"]
+        finegrained_sample_num = kernels[kernel_type]["FINEGRAINED_SAMPLE_NUM"]
+        iteration = kernels[kernel_type]["ITERATION"]
+        error_threshold = kernels[kernel_type]["ERROR_THRESHOLD"]
+        build_predictor_for_kernel(
+            kernel_type, backend,
+            init_sample_num=init_sample_num,
+            finegrained_sample_num=finegrained_sample_num,
+            iteration=iteration,
+            error_threshold=error_threshold,
+            predict_label="power",
+            metrics=["power"],
             )
