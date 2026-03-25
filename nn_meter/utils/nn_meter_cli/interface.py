@@ -5,6 +5,7 @@ import logging
 import argparse
 from .registry import register_module_cli, unregister_module_cli
 from .predictor import list_latency_predictors_cli, apply_latency_predictor_cli, get_nnmeter_ir_cli
+from .power_predictor import list_power_predictors_cli, apply_power_predictor_cli
 from .builder import list_backends_cli, list_kernels_cli, list_operators_cli, list_special_testcases_cli, \
     test_backend_connection_cli, create_workspace_cli
 
@@ -12,6 +13,8 @@ from .builder import list_backends_cli, list_kernels_cli, list_operators_cli, li
 def nn_meter_info(args):
     if args.list_predictors:
         list_latency_predictors_cli()
+    elif args.list_power_predictors:
+        list_power_predictors_cli()
     elif args.list_backends:
         list_backends_cli()
     elif args.list_kernels:
@@ -36,7 +39,13 @@ def nn_meter_cli():
     )
     parser.add_argument(
         '--list-predictors',
-        help='list all supported predictors',
+        help='list all supported latency predictors',
+        action='store_true',
+        default=False
+    )
+    parser.add_argument(
+        '--list-power-predictors',
+        help='list all supported power predictors',
         action='store_true',
         default=False
     )
@@ -105,6 +114,46 @@ def nn_meter_cli():
         help="name of the input torch model from the torchvision model zoo"
     )
     lat_pred.set_defaults(func=apply_latency_predictor_cli)
+
+    power_pred = subparsers.add_parser(
+        'predict_power',
+        aliases=['power_pred'],
+        help='apply power predictor for testing model (average power in W)',
+    )
+    power_pred.add_argument(
+        "--predictor",
+        type=str,
+        help="name of target power predictor (hardware)",
+    )
+    power_pred.add_argument(
+        "--predictor-version",
+        type=float,
+        help="the version of the power predictor (if not specified, use the latest version)",
+        default=None,
+    )
+    power_model_type = power_pred.add_mutually_exclusive_group()
+    power_model_type.add_argument(
+        "--tensorflow",
+        type=str,
+        help="path to input Tensorflow model (*.pb file or floder)",
+    )
+    power_model_type.add_argument(
+        "--onnx",
+        type=str,
+        help="path to input ONNX model (*.onnx file or floder)",
+    )
+    power_model_type.add_argument(
+        "--nn-meter-ir",
+        type=str,
+        help="path to input nn-Meter IR model (*.json file or floder)",
+    )
+    power_model_type.add_argument(
+        "--torchvision",
+        type=str,
+        nargs="+",
+        help="name of the input torch model from the torchvision model zoo",
+    )
+    power_pred.set_defaults(func=apply_power_predictor_cli)
 
     # Usage 2: get nn-meter-ir model from tensorflow pbfile or onnx file
     # Usage: nn-meter get_ir --tensorflow <pb-file>
