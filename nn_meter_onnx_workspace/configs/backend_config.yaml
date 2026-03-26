@@ -15,8 +15,10 @@ INTRA_OP_NUM_THREADS: 0     # 0 => ORT default
 INTER_OP_NUM_THREADS: 0     # 0 => ORT default
 
 # Benchmark settings (inference timing)
-WARMUP_RUNS: 10
-NUM_RUNS: 50
+WARMUP_RUNS: 5
+NUM_RUNS: 20
+# Seconds to sleep after each profiled model (default 0.2 elsewhere). Use 0 for local ONNX to avoid ~100s idle on 500 samples.
+INTER_MODEL_SLEEP_S: 0
 BATCH_SIZE: 1
 
 # If true, include ORT provider list in profiler output
