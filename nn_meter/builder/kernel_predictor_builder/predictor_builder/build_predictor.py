@@ -64,7 +64,15 @@ def build_predictor_by_data(kernel_type, kernel_data, backend = None, error_thre
         # start training
         predictor.fit(trainx, trainy)
         predicts = predictor.predict(testx)
-        pred_error_list = [abs(y1 - y2) / y1 for y1, y2 in zip(testy, predicts)]
+        # Power labels can include very small values; pure relative error over-penalizes
+        # these points and may amplify hard-case sampling across iterations.
+        if predict_label == "power":
+            abs_targets = sorted(abs(float(y)) for y in Y)
+            p10_idx = int(0.1 * (len(abs_targets) - 1)) if len(abs_targets) > 1 else 0
+            rel_base = max(1e-6, abs_targets[p10_idx])
+            pred_error_list = [abs(y1 - y2) / max(abs(float(y1)), rel_base) for y1, y2 in zip(testy, predicts)]
+        else:
+            pred_error_list = [abs(y1 - y2) / y1 for y1, y2 in zip(testy, predicts)]
         rmse, rmspe, error, acc5, acc10, acc15 = latency_metrics(predicts, testy)
         logging.info(f"rmse: {rmse:.4f}; rmspe: {rmspe:.4f}; error: {error:.4f}; 5% accuracy: {acc5:.4f}; 10% accuracy: {acc10:.4f}; 15% accuracy: {acc15:.4f}.")
         
@@ -79,10 +87,10 @@ def build_predictor_by_data(kernel_type, kernel_data, backend = None, error_thre
 
         # locate large error data
         error_configs = []
-        for i in range(len(testx)):
-            if pred_error_list[i] > error_threshold:
-                error_config = feature_parser.get_config_by_feature(testx[i])
-                error_configs.append(error_config)
+        candidate_idx = [i for i in range(len(testx)) if pred_error_list[i] > error_threshold]
+        for i in candidate_idx:
+            error_config = feature_parser.get_config_by_feature(testx[i])
+            error_configs.append(error_config)
 
     # dump the predictor model
     if pred_save_path:
