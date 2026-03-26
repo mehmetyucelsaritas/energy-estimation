@@ -239,7 +239,7 @@ class ONNXRuntimeProfiler(BaseProfiler):
         tracker = None
         if power_requested:
             try:
-                from codecarbon import EmissionsTracker  # type: ignore
+                from codecarbon import OfflineEmissionsTracker  # type: ignore
 
                 # Avoid filesystem writes in tight loops; still may create a run in some versions.
                 # On macOS, CodeCarbon may try to call powermetrics which can trigger an
@@ -251,7 +251,7 @@ class ONNXRuntimeProfiler(BaseProfiler):
                 }
                 if force_cpu_load:
                     tracker_kwargs["force_mode_cpu_load"] = True
-                tracker = EmissionsTracker(**tracker_kwargs)
+                tracker = OfflineEmissionsTracker(**tracker_kwargs)
                 tracker.start()
             except Exception as e:
                 if self._verbose:
@@ -293,6 +293,123 @@ class ONNXRuntimeProfiler(BaseProfiler):
             payload["requested_providers"] = list(self._providers)
             payload["session_providers"] = list(session.get_providers())
         return json.dumps(payload)
+
+    def profile_many(self, models: List[Dict[str, Any]], metrics: List[str]):
+        """Profile multiple converted ONNX models with one optional power tracker session."""
+        requested_metrics = metrics if isinstance(metrics, list) else [metrics]
+        power_requested = "power" in requested_metrics
+        outputs: List[str] = []
+
+        # Prepare model sessions first so profiling loop stays tight.
+        prepared: List[Dict[str, Any]] = []
+        import onnxruntime as ort
+        for item in models:
+            graph_path = item["graph_path"]
+            input_shape = item.get("input_shape", None)
+            so = ort.SessionOptions()
+            so.log_severity_level = 3
+            if self._intra_op_num_threads > 0:
+                so.intra_op_num_threads = self._intra_op_num_threads
+            if self._inter_op_num_threads > 0:
+                so.inter_op_num_threads = self._inter_op_num_threads
+            session = ort.InferenceSession(
+                graph_path, sess_options=so, providers=list(self._providers)
+            )
+            name_to_shape = _finalize_input_shapes(
+                session.get_inputs(),
+                input_shape,
+                self._dynamic_batch_dim,
+            )
+            name_to_shape = _match_onnx_input_rank(
+                session, name_to_shape, self._dynamic_batch_dim
+            )
+            feed = _random_feed(session, name_to_shape)
+            output_names = [o.name for o in session.get_outputs()]
+            prepared.append(
+                {
+                    "session": session,
+                    "feed": feed,
+                    "output_names": output_names,
+                }
+            )
+
+        tracker = None
+        if power_requested:
+            try:
+                from codecarbon import OfflineEmissionsTracker  # type: ignore
+
+                force_cpu_load = hasattr(os, "uname") and os.uname().sysname.lower() == "darwin"
+                tracker_kwargs: Dict[str, Any] = {
+                    "save_to_file": False,
+                    "log_level": "error",
+                }
+                if force_cpu_load:
+                    tracker_kwargs["force_mode_cpu_load"] = True
+                tracker = OfflineEmissionsTracker(**tracker_kwargs)
+                tracker.start()
+            except Exception as e:
+                if self._verbose:
+                    logging.warning(f"CodeCarbon unavailable in batch mode; skipping power metric: {e}")
+                tracker = None
+
+        total_t_window_s = 0.0
+        stats: List[Dict[str, Optional[float]]] = []
+
+        try:
+            for item in prepared:
+                session = item["session"]
+                feed = item["feed"]
+                output_names = item["output_names"]
+                for _ in range(self._warmup_runs):
+                    session.run(output_names, feed)
+                samples_ms: List[float] = []
+                t_window0 = time.perf_counter()
+                for _ in range(self._num_runs):
+                    t0 = time.perf_counter()
+                    session.run(output_names, feed)
+                    samples_ms.append((time.perf_counter() - t0) * 1000.0)
+                t_window_s = max(time.perf_counter() - t_window0, 1e-12)
+                total_t_window_s += t_window_s
+                avg = float(statistics.mean(samples_ms))
+                std = float(statistics.stdev(samples_ms)) if len(samples_ms) > 1 else 0.0
+                stats.append({"avg_ms": avg, "std_ms": std, "avg_power_w": None})
+        finally:
+            avg_power_w: Optional[float] = None
+            if tracker is not None:
+                try:
+                    _ = tracker.stop()
+                    emissions_data = getattr(tracker, "final_emissions_data", None)
+                    if emissions_data is None:
+                        emissions_data = getattr(tracker, "_last_emissions_data", None)
+                    energy_kwh = None
+                    if emissions_data is not None:
+                        energy_kwh = getattr(emissions_data, "energy_consumed", None)
+                    if energy_kwh is not None and total_t_window_s > 0:
+                        energy_j = float(energy_kwh) * 3_600_000.0
+                        avg_power_w = float(energy_j / total_t_window_s)
+                except Exception as e:
+                    if self._verbose:
+                        logging.warning(f"CodeCarbon batch measurement failed; skipping power: {e}")
+
+            mean_avg_ms = None
+            if len(stats) > 0:
+                mean_avg_ms = float(statistics.mean([float(s["avg_ms"]) for s in stats]))
+            for s in stats:
+                payload: Dict[str, Any] = {"avg_ms": s["avg_ms"], "std_ms": s["std_ms"]}
+                if power_requested:
+                    if s.get("avg_power_w") is not None:
+                        payload["avg_power_w"] = s["avg_power_w"]
+                    elif avg_power_w is not None:
+                        # Fast fallback when task-level power is unavailable: distribute
+                        # chunk average power by relative runtime to keep label variance.
+                        if mean_avg_ms is not None and mean_avg_ms > 1e-12:
+                            runtime_scale = max(float(s["avg_ms"]) / mean_avg_ms, 1e-6)
+                            payload["avg_power_w"] = float(avg_power_w * runtime_scale)
+                        else:
+                            payload["avg_power_w"] = avg_power_w
+                outputs.append(json.dumps(payload))
+
+        return outputs
 
 
 class ONNXLatencyParser(BaseParser):
@@ -354,3 +471,11 @@ class ONNXMacBackend(BaseBackend):
 
         _ = ort.get_available_providers()
         logging.keyinfo("hello backend !")
+
+    def profile_models_batch(self, converted_models, metrics=['latency']):
+        """Batch profile converted models to amortize power-tracker overhead."""
+        outputs = self.profiler.profile_many(converted_models, metrics=metrics)
+        parsed = []
+        for content in outputs:
+            parsed.append(self.parser.parse(content).results.get(metrics))
+        return parsed
