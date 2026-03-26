@@ -46,3 +46,10 @@ docs/_build/
 
 # Workflow files
 .github/*
+
+# onnx models
+*.onnx
+nn_meter_onnx_workspace/predictor_build/results/*
+
+IDE related
+.vscode/*
