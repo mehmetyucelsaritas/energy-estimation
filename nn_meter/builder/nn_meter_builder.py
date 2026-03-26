@@ -2,11 +2,11 @@
 # Licensed under the MIT license.
 import os
 import json
-import time
 import signal
 import shutil
 import logging
 import subprocess
+import random
 from . import builder_config
 from .utils import save_profiled_results, merge_info, handle_timeout
 from nn_meter.builder.backends import connect_backend
@@ -152,6 +152,77 @@ def profile_models(backend, models, mode = 'ruletest', metrics = ["latency"], sa
     except (ValueError, TypeError):
         inter_model_sleep_s = 0.2
     logging.info("Profiling ...")
+
+    # Power batch fast-path for backends that support it.
+    # This amortizes expensive power-tracker startup/teardown over many models.
+    if (
+        metrics == ["power"]
+        and (not broken_point_mode)
+        and hasattr(backend, "profile_models_batch")
+    ):
+        batch_items = []
+        model_refs = []
+        for module in models.values():
+            for model_id, model in module.items():
+                try:
+                    if have_converted and "converted_model" in model:
+                        converted_path = model["converted_model"]
+                    elif (not have_converted) and "model" in model:
+                        src_model_path = model["model"]
+                        converted_path = backend.convert_model(
+                            src_model_path,
+                            model_save_path or os.path.dirname(src_model_path),
+                            input_shape=model.get("shapes"),
+                        )
+                        model["converted_model"] = converted_path
+                    else:
+                        continue
+                    batch_items.append(
+                        {
+                            "graph_path": converted_path,
+                            "input_shape": model.get("shapes"),
+                        }
+                    )
+                    model_refs.append(model)
+                except Exception as e:
+                    open(error_save_path, 'a').write(f"batch_convert_{model_id}: {e}\n")
+        if len(batch_items) > 0:
+            try:
+                chunk_size = len(batch_items)
+                try:
+                    _bc2 = builder_config.get_module("backend")
+                    if isinstance(_bc2, dict) and _bc2.get("POWER_BATCH_CHUNK_SIZE") is not None:
+                        chunk_size = int(_bc2.get("POWER_BATCH_CHUNK_SIZE"))
+                except (ValueError, TypeError):
+                    chunk_size = len(batch_items)
+                if chunk_size <= 0:
+                    chunk_size = len(batch_items)
+                total_profiled = 0
+                for i in range(0, len(batch_items), chunk_size):
+                    chunk_items = batch_items[i:i + chunk_size]
+                    chunk_refs = model_refs[i:i + chunk_size]
+                    profiled_chunk = backend.profile_models_batch(chunk_items, metrics=metrics)
+                    for model, profiled_res in zip(chunk_refs, profiled_chunk):
+                        for metric in metrics:
+                            model[metric] = profiled_res[metric]
+                    total_profiled += len(profiled_chunk)
+                    if total_profiled % log_frequency == 0:
+                        save_profiled_results(models, info_save_path, detail, metrics)
+                        logging.keyinfo(
+                            f"{total_profiled} models complete. Still profiling (batch power mode)... "
+                            f"Save the intermediate results to {info_save_path} "
+                        )
+                save_profiled_results(models, info_save_path, detail, metrics)
+                logging.keyinfo(
+                    f"All {total_profiled} models profiling complete (batch power mode). "
+                    f"Save all success profiled results to {info_save_path}"
+                )
+                return models
+            except Exception as e:
+                logging.warning(
+                    f"Batch power profiling failed, fallback to per-model profiling: {e}"
+                )
+
     for module in models.values():
         for id, model in module.items():
             if broken_point_mode:
@@ -248,7 +319,8 @@ def sample_and_profile_kernel_data(kernel_type, sample_num, backend, sampling_mo
 
 def build_predictor_for_kernel(kernel_type, backend, init_sample_num = 1000, finegrained_sample_num = 10,
                                iteration = 5, error_threshold = 0.1, predict_label = "latency", mark = "",
-                               metrics = ["latency"], result_subdir = "", predbuild_config_module = 'predbuild'):
+                               metrics = ["latency"], result_subdir = "", predbuild_config_module = 'predbuild',
+                               max_error_configs = None):
     """ 
     Build latency predictor for given kernel. This method contains three main steps:
     1. sample kernel configs and profile kernel model based on configs;
@@ -299,13 +371,23 @@ def build_predictor_for_kernel(kernel_type, backend, init_sample_num = 1000, fin
     logging.keyinfo(f'Iteration 0: acc10 {acc10}, error_configs number: {len(error_configs)}')
 
     for i in range(1, iteration):
+        iter_error_configs = error_configs
+        if (
+            max_error_configs is not None
+            and isinstance(iter_error_configs, list)
+            and len(iter_error_configs) > int(max_error_configs)
+        ):
+            # Keep hard-case sampling bounded to avoid over-concentrating data distribution.
+            rng = random.Random(10 + i)
+            iter_error_configs = rng.sample(iter_error_configs, int(max_error_configs))
+
         # finegrained sampling and profiling for large error data
         new_kernel_data = sample_and_profile_kernel_data(
             kernel_type,
             finegrained_sample_num,
             backend,
             sampling_mode='finegrained',
-            configs=error_configs,
+            configs=iter_error_configs,
             mark=f'finegrained{i}{mark}',
             metrics=metrics,
             result_subdir=result_subdir,
@@ -382,6 +464,7 @@ def build_power_predictor(backend):
         finegrained_sample_num = kernels[kernel_type]["FINEGRAINED_SAMPLE_NUM"]
         iteration = kernels[kernel_type]["ITERATION"]
         error_threshold = kernels[kernel_type]["ERROR_THRESHOLD"]
+        max_error_configs = kernels[kernel_type].get("MAX_ERROR_CONFIGS", None)
         build_predictor_for_kernel(
             kernel_type, backend,
             init_sample_num=init_sample_num,
@@ -392,4 +475,5 @@ def build_power_predictor(backend):
             metrics=["power"],
             result_subdir="power",
             predbuild_config_module='predbuild_power',
+            max_error_configs=max_error_configs,
             )
