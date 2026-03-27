@@ -334,6 +334,7 @@ class ONNXRuntimeProfiler(BaseProfiler):
             )
 
         tracker = None
+        prev_total_energy_kwh: Optional[float] = None
         if power_requested:
             try:
                 from codecarbon import OfflineEmissionsTracker  # type: ignore
@@ -341,12 +342,29 @@ class ONNXRuntimeProfiler(BaseProfiler):
                 force_cpu_load = hasattr(os, "uname") and os.uname().sysname.lower() == "darwin"
                 tracker_kwargs: Dict[str, Any] = {
                     "save_to_file": False,
+                    "save_to_api": False,
                     "log_level": "error",
                 }
                 if force_cpu_load:
                     tracker_kwargs["force_mode_cpu_load"] = True
+                    # Force CPU load mode on Apple Silicon to avoid powermetrics subprocess
+                    # calls (~seconds per checkpoint) and keep per-model checkpoints fast.
+                    tracker_kwargs["force_cpu_power"] = float(
+                        os.environ.get("NNMETER_FORCE_CPU_POWER_W", "85")
+                    )
                 tracker = OfflineEmissionsTracker(**tracker_kwargs)
                 tracker.start()
+                # Lower overhead in large batch profiling: avoid background monitoring thread
+                # and periodic scheduler, then use explicit per-model checkpoints below.
+                scheduler = getattr(tracker, "_scheduler", None)
+                if scheduler is not None:
+                    scheduler.stop()
+                scheduler_monitor = getattr(tracker, "_scheduler_monitor_power", None)
+                if scheduler_monitor is not None:
+                    scheduler_monitor.stop()
+                total_energy = getattr(tracker, "_total_energy", None)
+                if total_energy is not None:
+                    prev_total_energy_kwh = float(getattr(total_energy, "kWh", 0.0))
             except Exception as e:
                 if self._verbose:
                     logging.warning(f"CodeCarbon unavailable in batch mode; skipping power metric: {e}")
@@ -372,7 +390,34 @@ class ONNXRuntimeProfiler(BaseProfiler):
                 total_t_window_s += t_window_s
                 avg = float(statistics.mean(samples_ms))
                 std = float(statistics.stdev(samples_ms)) if len(samples_ms) > 1 else 0.0
-                stats.append({"avg_ms": avg, "std_ms": std, "avg_power_w": None})
+                per_model_avg_power_w: Optional[float] = None
+                if power_requested and tracker is not None:
+                    try:
+                        if hasattr(tracker, "_measure_power_and_energy"):
+                            tracker._measure_power_and_energy()  # type: ignore[attr-defined]
+                        total_energy = getattr(tracker, "_total_energy", None)
+                        if total_energy is not None:
+                            curr_total_energy_kwh = float(getattr(total_energy, "kWh", 0.0))
+                            if prev_total_energy_kwh is None:
+                                prev_total_energy_kwh = curr_total_energy_kwh
+                            delta_energy_kwh = max(
+                                curr_total_energy_kwh - prev_total_energy_kwh, 0.0
+                            )
+                            prev_total_energy_kwh = curr_total_energy_kwh
+                            energy_j = float(delta_energy_kwh) * 3_600_000.0
+                            per_model_avg_power_w = float(energy_j / t_window_s)
+                    except Exception as e:
+                        if self._verbose:
+                            logging.warning(
+                                f"CodeCarbon per-model checkpoint failed; fallback to batch power: {e}"
+                            )
+                stats.append(
+                    {
+                        "avg_ms": avg,
+                        "std_ms": std,
+                        "avg_power_w": per_model_avg_power_w,
+                    }
+                )
         finally:
             avg_power_w: Optional[float] = None
             if tracker is not None:
