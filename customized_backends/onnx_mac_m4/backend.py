@@ -186,6 +186,7 @@ class ONNXRuntimeProfiler(BaseProfiler):
         intra_op_num_threads=0,
         inter_op_num_threads=0,
         verbose=False,
+        power_fast_legacy_delta=False,
     ):
         self._warmup_runs = int(warmup_runs)
         self._num_runs = int(num_runs)
@@ -194,6 +195,7 @@ class ONNXRuntimeProfiler(BaseProfiler):
         self._intra_op_num_threads = int(intra_op_num_threads or 0)
         self._inter_op_num_threads = int(inter_op_num_threads or 0)
         self._verbose = _truthy(verbose)
+        self._power_fast_legacy = _truthy(power_fast_legacy_delta)
 
     def profile(
         self,
@@ -237,26 +239,28 @@ class ONNXRuntimeProfiler(BaseProfiler):
         avg_power_w: Optional[float] = None
 
         tracker = None
+        cp_before = None
+        use_cc_checkpoint = False
         if power_requested:
             try:
                 from codecarbon import OfflineEmissionsTracker  # type: ignore
 
-                # Avoid filesystem writes in tight loops; still may create a run in some versions.
-                # On macOS, CodeCarbon may try to call powermetrics which can trigger an
-                # interactive sudo password prompt and stall profiling. Prefer CPU-load mode.
-                force_cpu_load = hasattr(os, "uname") and os.uname().sysname.lower() == "darwin"
-                tracker_kwargs: Dict[str, Any] = {
-                    "save_to_file": False,
-                    "log_level": "error",
-                }
-                if force_cpu_load:
-                    tracker_kwargs["force_mode_cpu_load"] = True
-                tracker = OfflineEmissionsTracker(**tracker_kwargs)
+                tracker = OfflineEmissionsTracker(
+                    save_to_file=False,
+                    save_to_api=False,
+                    log_level="error",
+                )
                 tracker.start()
+                use_cc_checkpoint = callable(getattr(tracker, "checkpoint", None))
+                if use_cc_checkpoint:
+                    cp_before = tracker.checkpoint()
+                    if cp_before is None:
+                        use_cc_checkpoint = False
             except Exception as e:
                 if self._verbose:
                     logging.warning(f"CodeCarbon unavailable; skipping power metric: {e}")
                 tracker = None
+                use_cc_checkpoint = False
 
         t_window0 = time.perf_counter()
         try:
@@ -268,18 +272,24 @@ class ONNXRuntimeProfiler(BaseProfiler):
             t_window_s = max(time.perf_counter() - t_window0, 1e-12)
             if tracker is not None:
                 try:
-                    _ = tracker.stop()  # returns kgCO2e; we use energy if present in final data
-                    emissions_data = getattr(tracker, "final_emissions_data", None)
-                    if emissions_data is None:
-                        # Some versions expose last_emissions_data.
-                        emissions_data = getattr(tracker, "_last_emissions_data", None)
-
-                    energy_kwh = None
-                    if emissions_data is not None:
-                        energy_kwh = getattr(emissions_data, "energy_consumed", None)
-                    if energy_kwh is not None:
-                        energy_j = float(energy_kwh) * 3_600_000.0
-                        avg_power_w = float(energy_j / t_window_s)
+                    if use_cc_checkpoint and cp_before is not None:
+                        cp_after = tracker.checkpoint()
+                        if cp_after is not None:
+                            seg = cp_after.segment_since(cp_before)
+                            delta_kwh = max(float(seg.energy_consumed_kwh), 0.0)
+                            energy_j = float(delta_kwh) * 3_600_000.0
+                            avg_power_w = float(energy_j / t_window_s)
+                    _ = tracker.stop()
+                    if avg_power_w is None:
+                        emissions_data = getattr(tracker, "final_emissions_data", None)
+                        if emissions_data is None:
+                            emissions_data = getattr(tracker, "_last_emissions_data", None)
+                        energy_kwh = None
+                        if emissions_data is not None:
+                            energy_kwh = getattr(emissions_data, "energy_consumed", None)
+                        if energy_kwh is not None:
+                            energy_j = float(energy_kwh) * 3_600_000.0
+                            avg_power_w = float(energy_j / t_window_s)
                 except Exception as e:
                     if self._verbose:
                         logging.warning(f"CodeCarbon measurement failed; skipping power: {e}")
@@ -295,7 +305,13 @@ class ONNXRuntimeProfiler(BaseProfiler):
         return json.dumps(payload)
 
     def profile_many(self, models: List[Dict[str, Any]], metrics: List[str]):
-        """Profile multiple converted ONNX models with one optional power tracker session."""
+        """Profile multiple converted ONNX models in one CodeCarbon session when power is requested.
+
+        Used by ``build_power_predictor`` via ``ONNXMacBackend.profile_models_batch``: one
+        ``tracker.start()``/``stop()``, and per-model average power from
+        ``checkpoint()``/``segment_since()`` energy divided by that model's timed window
+        (when CodeCarbon exposes ``checkpoint()``).
+        """
         requested_metrics = metrics if isinstance(metrics, list) else [metrics]
         power_requested = "power" in requested_metrics
         outputs: List[str] = []
@@ -334,41 +350,56 @@ class ONNXRuntimeProfiler(BaseProfiler):
             )
 
         tracker = None
+        use_cc_checkpoint = False
         prev_total_energy_kwh: Optional[float] = None
         if power_requested:
             try:
                 from codecarbon import OfflineEmissionsTracker  # type: ignore
 
-                force_cpu_load = hasattr(os, "uname") and os.uname().sysname.lower() == "darwin"
-                tracker_kwargs: Dict[str, Any] = {
-                    "save_to_file": False,
-                    "save_to_api": False,
-                    "log_level": "error",
-                }
-                if force_cpu_load:
-                    tracker_kwargs["force_mode_cpu_load"] = True
-                    # Force CPU load mode on Apple Silicon to avoid powermetrics subprocess
-                    # calls (~seconds per checkpoint) and keep per-model checkpoints fast.
-                    tracker_kwargs["force_cpu_power"] = float(
-                        os.environ.get("NNMETER_FORCE_CPU_POWER_W", "85")
-                    )
-                tracker = OfflineEmissionsTracker(**tracker_kwargs)
+                tracker = OfflineEmissionsTracker(
+                    save_to_file=False,
+                    save_to_api=False,
+                    log_level="error",
+                )
                 tracker.start()
-                # Lower overhead in large batch profiling: avoid background monitoring thread
-                # and periodic scheduler, then use explicit per-model checkpoints below.
-                scheduler = getattr(tracker, "_scheduler", None)
-                if scheduler is not None:
-                    scheduler.stop()
-                scheduler_monitor = getattr(tracker, "_scheduler_monitor_power", None)
-                if scheduler_monitor is not None:
-                    scheduler_monitor.stop()
-                total_energy = getattr(tracker, "_total_energy", None)
-                if total_energy is not None:
-                    prev_total_energy_kwh = float(getattr(total_energy, "kWh", 0.0))
+                use_cc_checkpoint = callable(getattr(tracker, "checkpoint", None))
+                if not use_cc_checkpoint:
+                    logging.warning(
+                        "CodeCarbon has no checkpoint(); batch power falls back to sequential "
+                        "deltas (install a build with checkpoint(), e.g. from codecarbon-master) "
+                        "for clearer per-model attribution."
+                    )
+                    # Legacy CodeCarbon: stop background threads; measure after each model.
+                    scheduler = getattr(tracker, "_scheduler", None)
+                    if scheduler is not None:
+                        scheduler.stop()
+                    scheduler_monitor = getattr(tracker, "_scheduler_monitor_power", None)
+                    if scheduler_monitor is not None:
+                        scheduler_monitor.stop()
+                    total_energy = getattr(tracker, "_total_energy", None)
+                    if total_energy is not None:
+                        prev_total_energy_kwh = float(getattr(total_energy, "kWh", 0.0))
+                elif self._power_fast_legacy:
+                    # One _measure_power_and_energy per model (~2x faster than two checkpoints);
+                    # energy delta includes that model's warmup; denominator is timed window only.
+                    logging.info(
+                        "POWER_FAST_LEGACY_DELTA: batch power uses one CodeCarbon sample per model."
+                    )
+                    use_cc_checkpoint = False
+                    scheduler = getattr(tracker, "_scheduler", None)
+                    if scheduler is not None:
+                        scheduler.stop()
+                    scheduler_monitor = getattr(tracker, "_scheduler_monitor_power", None)
+                    if scheduler_monitor is not None:
+                        scheduler_monitor.stop()
+                    total_energy = getattr(tracker, "_total_energy", None)
+                    if total_energy is not None:
+                        prev_total_energy_kwh = float(getattr(total_energy, "kWh", 0.0))
             except Exception as e:
                 if self._verbose:
                     logging.warning(f"CodeCarbon unavailable in batch mode; skipping power metric: {e}")
                 tracker = None
+                use_cc_checkpoint = False
 
         total_t_window_s = 0.0
         stats: List[Dict[str, Optional[float]]] = []
@@ -380,6 +411,19 @@ class ONNXRuntimeProfiler(BaseProfiler):
                 output_names = item["output_names"]
                 for _ in range(self._warmup_runs):
                     session.run(output_names, feed)
+                cp_before = None
+                if power_requested and tracker is not None and use_cc_checkpoint:
+                    try:
+                        cp_before = tracker.checkpoint()
+                        if cp_before is None:
+                            raise RuntimeError("checkpoint() returned None before model window")
+                    except Exception as e:
+                        if self._verbose:
+                            logging.warning(
+                                f"CodeCarbon checkpoint before model failed: {e}; "
+                                "power for this model may be missing."
+                            )
+                        cp_before = None
                 samples_ms: List[float] = []
                 t_window0 = time.perf_counter()
                 for _ in range(self._num_runs):
@@ -393,23 +437,32 @@ class ONNXRuntimeProfiler(BaseProfiler):
                 per_model_avg_power_w: Optional[float] = None
                 if power_requested and tracker is not None:
                     try:
-                        if hasattr(tracker, "_measure_power_and_energy"):
-                            tracker._measure_power_and_energy()  # type: ignore[attr-defined]
-                        total_energy = getattr(tracker, "_total_energy", None)
-                        if total_energy is not None:
-                            curr_total_energy_kwh = float(getattr(total_energy, "kWh", 0.0))
-                            if prev_total_energy_kwh is None:
-                                prev_total_energy_kwh = curr_total_energy_kwh
-                            delta_energy_kwh = max(
-                                curr_total_energy_kwh - prev_total_energy_kwh, 0.0
-                            )
-                            prev_total_energy_kwh = curr_total_energy_kwh
+                        if use_cc_checkpoint and cp_before is not None:
+                            cp_after = tracker.checkpoint()
+                            if cp_after is None:
+                                raise RuntimeError("checkpoint() returned None after model window")
+                            seg = cp_after.segment_since(cp_before)
+                            delta_energy_kwh = max(float(seg.energy_consumed_kwh), 0.0)
                             energy_j = float(delta_energy_kwh) * 3_600_000.0
                             per_model_avg_power_w = float(energy_j / t_window_s)
+                        else:
+                            if hasattr(tracker, "_measure_power_and_energy"):
+                                tracker._measure_power_and_energy()  # type: ignore[attr-defined]
+                            total_energy = getattr(tracker, "_total_energy", None)
+                            if total_energy is not None:
+                                curr_total_energy_kwh = float(getattr(total_energy, "kWh", 0.0))
+                                if prev_total_energy_kwh is None:
+                                    prev_total_energy_kwh = curr_total_energy_kwh
+                                delta_energy_kwh = max(
+                                    curr_total_energy_kwh - prev_total_energy_kwh, 0.0
+                                )
+                                prev_total_energy_kwh = curr_total_energy_kwh
+                                energy_j = float(delta_energy_kwh) * 3_600_000.0
+                                per_model_avg_power_w = float(energy_j / t_window_s)
                     except Exception as e:
                         if self._verbose:
                             logging.warning(
-                                f"CodeCarbon per-model checkpoint failed; fallback to batch power: {e}"
+                                f"CodeCarbon per-model energy failed; fallback to batch power: {e}"
                             )
                 stats.append(
                     {
@@ -495,6 +548,7 @@ class ONNXMacBackend(BaseBackend):
                 "intra_op_num_threads": c.get("INTRA_OP_NUM_THREADS", 0),
                 "inter_op_num_threads": c.get("INTER_OP_NUM_THREADS", 0),
                 "verbose": c.get("VERBOSE", False),
+                "power_fast_legacy_delta": _truthy(c.get("POWER_FAST_LEGACY_DELTA", False)),
             }
         )
 
@@ -518,7 +572,7 @@ class ONNXMacBackend(BaseBackend):
         logging.keyinfo("hello backend !")
 
     def profile_models_batch(self, converted_models, metrics=['latency']):
-        """Batch profile converted models to amortize power-tracker overhead."""
+        """Batch profile models; with ``metrics=['power']``, one tracker session and per-model power."""
         outputs = self.profiler.profile_many(converted_models, metrics=metrics)
         parsed = []
         for content in outputs:

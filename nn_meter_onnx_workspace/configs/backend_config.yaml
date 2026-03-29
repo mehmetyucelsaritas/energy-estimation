@@ -23,3 +23,8 @@ BATCH_SIZE: 1
 
 # If true, include ORT provider list in profiler output
 VERBOSE: false
+# Batch power (build_power_predictor): one CodeCarbon hardware sample per model instead of two
+# checkpoints—much faster on macOS; avg_power = delta since last sample / timed window (warmup
+# energy is in the delta). Set false for stricter timed-only energy via checkpoint segments.
+POWER_FAST_LEGACY_DELTA: true
+POWER_BATCH_CHUNK_SIZE: 50
