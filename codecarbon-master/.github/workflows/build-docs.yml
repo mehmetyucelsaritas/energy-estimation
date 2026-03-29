@@ -1,0 +1,45 @@
+name: Build Documentation
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "docs/**"
+      - "mkdocs.yml"
+  pull_request:
+    branches: [master]
+    paths:
+      - "docs/**"
+      - "mkdocs.yml"
+      - ".github/workflows/build-docs.yml"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@caf0cab7a618c569241d31dcd442f54681755d39 # v3.2.4
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        run: uv python install 3.11
+
+      - name: Install dependencies
+        run: uv sync --group doc
+
+      - name: Build docs
+        run: |
+          set -euo pipefail
+          # Run zensical and capture output, fail if command exits non-zero
+          uv run zensical build -f mkdocs.yml --clean 2>&1 | tee docs_build.log
+          # If output contains common error indicators, fail the step.
+          if grep -Ei "\b(error|failed|traceback|exception)\b" docs_build.log >/dev/null; then
+            echo "Documentation build produced errors; failing workflow."
+            exit 1
+          fi
