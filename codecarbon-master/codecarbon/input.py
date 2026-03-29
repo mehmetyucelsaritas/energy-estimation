@@ -9,9 +9,20 @@ They are loaded once at module import to avoid repeated file I/O on the hot path
 import atexit
 import json
 from contextlib import ExitStack
-from importlib.resources import as_file as importlib_resources_as_file
-from importlib.resources import files as importlib_resources_files
 from typing import Any, Dict
+
+try:
+    from importlib.resources import as_file as importlib_resources_as_file
+    from importlib.resources import files as importlib_resources_files
+except ImportError:  # Python < 3.9
+    try:
+        from importlib_resources import as_file as importlib_resources_as_file
+        from importlib_resources import files as importlib_resources_files
+    except ImportError as exc:  # pragma: no cover
+        raise ImportError(
+            "CodeCarbon requires Python 3.9+ or the 'importlib_resources' package. "
+            "Install with: pip install importlib_resources"
+        ) from exc
 
 import pandas as pd
 

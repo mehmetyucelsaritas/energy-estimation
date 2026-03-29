@@ -72,6 +72,70 @@ class EmissionsData:
         return json.dumps(self, default=lambda o: o.__dict__, sort_keys=True, indent=4)
 
 
+@dataclass(frozen=True)
+class EnergyCheckpoint:
+    """
+    Immutable snapshot of cumulative energy, water, and CO2eq at one instant.
+
+    Produced by :meth:`codecarbon.emissions_tracker.BaseEmissionsTracker.checkpoint`.
+    Use :meth:`segment_since` to obtain the delta between two checkpoints (e.g. one
+    model in a batch) without stopping the tracker or using task mode.
+    """
+
+    monotonic_time_s: float
+    cpu_energy_kwh: float
+    gpu_energy_kwh: float
+    ram_energy_kwh: float
+    energy_consumed_kwh: float
+    water_litres: float
+    emissions_kg: float
+
+    def segment_since(self, earlier: "EnergyCheckpoint") -> "EnergySegment":
+        """
+        Energy, water, and emissions accumulated between ``earlier`` and this checkpoint.
+
+        ``monotonic_time_s`` on each checkpoint must be from the same ``perf_counter``
+        clock (as returned by the tracker). ``earlier`` must be at or before this
+        checkpoint in time.
+        """
+        if earlier.monotonic_time_s > self.monotonic_time_s:
+            raise ValueError(
+                "earlier.monotonic_time_s must be <= self.monotonic_time_s "
+                "(checkpoints must be taken in order)."
+            )
+        return EnergySegment(
+            duration_s=self.monotonic_time_s - earlier.monotonic_time_s,
+            cpu_energy_kwh=self.cpu_energy_kwh - earlier.cpu_energy_kwh,
+            gpu_energy_kwh=self.gpu_energy_kwh - earlier.gpu_energy_kwh,
+            ram_energy_kwh=self.ram_energy_kwh - earlier.ram_energy_kwh,
+            energy_consumed_kwh=self.energy_consumed_kwh
+            - earlier.energy_consumed_kwh,
+            water_litres=self.water_litres - earlier.water_litres,
+            emissions_kg=self.emissions_kg - earlier.emissions_kg,
+        )
+
+
+@dataclass(frozen=True)
+class EnergySegment:
+    """
+    Delta between two :class:`EnergyCheckpoint` snapshots.
+
+    Energy fields are exact differences of cumulative tracker totals. ``duration_s``
+    is the difference of ``monotonic_time_s`` at snapshot time (after any
+    ``measure=True`` work in :meth:`checkpoint`), so it includes checkpoint overhead
+    on the second call—not a substitute for timing your model with ``perf_counter``
+    if you need pure code duration.
+    """
+
+    duration_s: float
+    cpu_energy_kwh: float
+    gpu_energy_kwh: float
+    ram_energy_kwh: float
+    energy_consumed_kwh: float
+    water_litres: float
+    emissions_kg: float
+
+
 @dataclass
 class TaskEmissionsData:
     task_name: str

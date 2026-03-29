@@ -3,6 +3,7 @@ Encapsulates external dependencies to retrieve hardware metadata
 """
 
 import math
+import os
 import re
 import time
 from abc import ABC, abstractmethod
@@ -27,6 +28,16 @@ CONSUMPTION_PERCENTAGE_CONSTANT = 0.5
 B_TO_GB = 1024 * 1024 * 1024
 
 MODE_CPU_LOAD = "cpu_load"
+
+# One ApplePowermetrics per output dir: CPU + GPU AppleSiliconChip share it (and get_details cache).
+_APPLE_PM_SINGLETON: Dict[str, ApplePowermetrics] = {}
+
+
+def _shared_apple_powermetrics(output_dir: str) -> ApplePowermetrics:
+    key = os.path.abspath(output_dir or ".")
+    if key not in _APPLE_PM_SINGLETON:
+        _APPLE_PM_SINGLETON[key] = ApplePowermetrics(output_dir)
+    return _APPLE_PM_SINGLETON[key]
 
 
 @dataclass
@@ -462,7 +473,7 @@ class AppleSiliconChip(BaseHardware):
     ):
         self._output_dir = output_dir
         self._model = model
-        self._interface = ApplePowermetrics(self._output_dir)
+        self._interface = _shared_apple_powermetrics(self._output_dir)
         self.chip_part = chip_part
 
     def __repr__(self) -> str:

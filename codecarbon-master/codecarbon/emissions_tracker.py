@@ -34,6 +34,7 @@ from codecarbon.output import (
     BaseOutput,
     CodeCarbonAPIOutput,
     EmissionsData,
+    EnergyCheckpoint,
     FileOutput,
     HTTPOutput,
     LogfireOutput,
@@ -709,6 +710,61 @@ class BaseEmissionsTracker(ABC):
         )
 
         return emissions_data.emissions
+
+    def checkpoint(self, *, measure: bool = True) -> Optional[EnergyCheckpoint]:
+        """
+        Capture cumulative energy and emissions at this instant without stopping
+        background schedulers or re-initializing hardware (unlike
+        :meth:`start_task` / :meth:`stop_task`).
+
+        When ``measure`` is ``True`` (default), runs a single
+        :meth:`_measure_power_and_energy` call so energy since the last measurement
+        is integrated—comparable cost to one periodic sample, not a full task
+        boundary teardown.
+
+        When ``measure`` is ``False``, reads current cumulative totals without a
+        fresh hardware read (values may be stale until the next periodic
+        measurement).
+
+        Intended usage after :meth:`start`::
+
+            tracker.start()
+            c0 = tracker.checkpoint()
+            run_model_a()
+            c1 = tracker.checkpoint()
+            segment_a = c1.segment_since(c0)
+
+        :param measure: If True, integrate energy since the last measurement before
+            snapshotting.
+        :return: :class:`~codecarbon.output.EnergyCheckpoint`, or ``None`` if the
+            tracker is not running or another instance holds the lock.
+        """
+        if (
+            hasattr(self, "_another_instance_already_running")
+            and self._another_instance_already_running
+        ):
+            logger.warning(
+                "Another instance of codecarbon is already running. Exiting."
+            )
+            return None
+        if self._start_time is None:
+            logger.error("You first need to start the tracker before checkpoint().")
+            return None
+
+        if measure:
+            self._measure_power_and_energy()
+
+        self._update_emissions()
+
+        return EnergyCheckpoint(
+            monotonic_time_s=time.perf_counter(),
+            cpu_energy_kwh=self._total_cpu_energy.kWh,
+            gpu_energy_kwh=self._total_gpu_energy.kWh,
+            ram_energy_kwh=self._total_ram_energy.kWh,
+            energy_consumed_kwh=self._total_energy.kWh,
+            water_litres=self._total_water.litres,
+            emissions_kg=self._total_emissions,
+        )
 
     @suppress(Exception)
     def stop(self) -> Optional[float]:

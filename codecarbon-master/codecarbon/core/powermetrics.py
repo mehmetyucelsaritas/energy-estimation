@@ -3,7 +3,8 @@ import re
 import shutil
 import subprocess
 import sys
-from typing import Dict
+import time
+from typing import Dict, Optional
 
 import numpy as np
 
@@ -90,6 +91,9 @@ class ApplePowermetrics:
 
     _osx_silicon_exec = "powermetrics"
 
+    # Reuse parse within this window so CPU + GPU AppleSiliconChip share one powermetrics run.
+    _DETAILS_CACHE_COALESCE_S = 0.08
+
     def __init__(
         self,
         output_dir: str = ".",
@@ -101,6 +105,8 @@ class ApplePowermetrics:
         self._system = sys.platform.lower()
         self._n_points = n_points
         self._interval = interval
+        self._cached_details: Optional[Dict] = None
+        self._cache_mono: float = 0.0
         self._setup_cli()
 
     def _setup_cli(self) -> None:
@@ -132,7 +138,6 @@ class ApplePowermetrics:
                 "powermetrics",
                 "-n",
                 str(self._n_points),
-                "",
                 "--samplers",
                 "cpu_power",
                 "--format",
@@ -154,11 +159,22 @@ class ApplePowermetrics:
             )
         return
 
-    def get_details(self) -> Dict:
+    def get_details(self, delay=None) -> Dict:
         """
-        Fetches the CPU Power Details by fetching values from a logged csv file
-        in _log_values function
+        Fetches CPU/GPU power from a powermetrics CSV run. ``delay`` is ignored (compat).
+
+        CodeCarbon calls this twice per tick (CPU + GPU AppleSiliconChip). Re-running
+        ``powermetrics`` each time doubles latency (~seconds per call); cache briefly so
+        both chips reuse one subprocess per measurement wave.
         """
+        _ = delay
+        now = time.monotonic()
+        if (
+            self._cached_details is not None
+            and (now - self._cache_mono) < self._DETAILS_CACHE_COALESCE_S
+        ):
+            return dict(self._cached_details)
+
         self._log_values()
         details = dict()
         try:
@@ -193,7 +209,9 @@ class ApplePowermetrics:
                 Exception occurred {e}",
                 exc_info=True,
             )
-        return details
+        self._cached_details = details
+        self._cache_mono = time.monotonic()
+        return dict(details)
 
     def start(self) -> None:
         # TODO: Read energy
