@@ -383,7 +383,8 @@ class ONNXRuntimeProfiler(BaseProfiler):
                     # One _measure_power_and_energy per model (~2x faster than two checkpoints);
                     # energy delta includes that model's warmup; denominator is timed window only.
                     logging.info(
-                        "POWER_FAST_LEGACY_DELTA: batch power uses one CodeCarbon sample per model."
+                        "POWER_FAST_LEGACY_DELTA: batch power uses post-warmup + post-timed samples "
+                        "per model (same energy window as checkpoint mode)."
                     )
                     use_cc_checkpoint = False
                     scheduler = getattr(tracker, "_scheduler", None)
@@ -411,6 +412,22 @@ class ONNXRuntimeProfiler(BaseProfiler):
                 output_names = item["output_names"]
                 for _ in range(self._warmup_runs):
                     session.run(output_names, feed)
+                # Legacy delta path: align numerator with checkpoint semantics (energy after
+                # warmup only). Otherwise warmup energy is divided by timed-only t_window_s.
+                if power_requested and tracker is not None and not use_cc_checkpoint:
+                    try:
+                        if hasattr(tracker, "_measure_power_and_energy"):
+                            tracker._measure_power_and_energy()  # type: ignore[attr-defined]
+                        total_energy_bw = getattr(tracker, "_total_energy", None)
+                        if total_energy_bw is not None:
+                            prev_total_energy_kwh = float(
+                                getattr(total_energy_bw, "kWh", 0.0)
+                            )
+                    except Exception as e:
+                        if self._verbose:
+                            logging.warning(
+                                f"CodeCarbon post-warmup baseline failed: {e}"
+                            )
                 cp_before = None
                 if power_requested and tracker is not None and use_cc_checkpoint:
                     try:
