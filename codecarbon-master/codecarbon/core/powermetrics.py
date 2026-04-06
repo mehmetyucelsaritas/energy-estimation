@@ -3,13 +3,50 @@ import re
 import shutil
 import subprocess
 import sys
+import threading
 import time
-from typing import Dict, Optional
+from contextlib import contextmanager
+from typing import Callable, Dict, Generator, List, Optional
 
 import numpy as np
 
 from codecarbon.core.util import detect_cpu_model
 from codecarbon.external.logger import logger
+
+# Stack so nested concurrent_sampling_workload() contexts behave intuitively.
+_concurrent_workload_stack: List[Callable[[], None]] = []
+
+
+@contextmanager
+def concurrent_sampling_workload(
+    workload: Callable[[], None],
+) -> Generator[None, None, None]:
+    """
+    Run ``workload`` in a tight loop on a side thread while `sudo powermetrics`
+    is executing inside :meth:`ApplePowermetrics.get_details` / ``_log_values``.
+
+    Apple ``powermetrics`` samples over a fixed window (several hundred ms to
+    seconds). If the workload under measurement finishes before that window,
+    samples reflect idle power. Callers that measure short GPU/NN inference runs
+    should wrap CodeCarbon checkpoints / ``stop()`` / manual measures with
+    this context manager so ``workload`` (e.g. ``session.run``) keeps the device
+    busy during the sampling interval.
+
+    ONNX Runtime sessions are not thread-safe for concurrent ``Run`` from
+    multiple threads; only the worker calls ``Run`` while the main thread is
+    blocked in ``subprocess.call(powermetrics)``.
+    """
+    _concurrent_workload_stack.append(workload)
+    try:
+        yield
+    finally:
+        _concurrent_workload_stack.pop()
+
+
+def _active_concurrent_workload() -> Optional[Callable[[], None]]:
+    if not _concurrent_workload_stack:
+        return None
+    return _concurrent_workload_stack[-1]
 
 
 def is_powermetrics_available() -> bool:
@@ -147,7 +184,34 @@ class ApplePowermetrics:
                 "-o",
                 self._log_file_path,
             ]
-            returncode = subprocess.call(cmd, universal_newlines=True)
+            workload = _active_concurrent_workload()
+            stop_evt = threading.Event()
+            worker: Optional[threading.Thread] = None
+            if workload is not None:
+
+                def _loop() -> None:
+                    while not stop_evt.is_set():
+                        try:
+                            workload()
+                        except Exception:
+                            logger.debug(
+                                "Powermetrics concurrent workload failed "
+                                "(continuing until sampling ends)",
+                                exc_info=True,
+                            )
+
+                worker = threading.Thread(
+                    target=_loop,
+                    name="codecarbon-powermetrics-workload",
+                    daemon=True,
+                )
+                worker.start()
+            try:
+                returncode = subprocess.call(cmd, universal_newlines=True)
+            finally:
+                if worker is not None:
+                    stop_evt.set()
+                    worker.join(timeout=120.0)
 
         else:
             return None
