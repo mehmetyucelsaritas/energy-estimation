@@ -8,7 +8,17 @@ import time
 import os
 import shutil
 import statistics
-from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
+from contextlib import nullcontext
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
+
+try:
+    from codecarbon.core.powermetrics import concurrent_sampling_workload
+except Exception:  # pragma: no cover — older CodeCarbon without overlap helper
+
+    def concurrent_sampling_workload(  # type: ignore[misc]
+        _workload: Callable[[], None],
+    ):
+        return nullcontext()
 
 import numpy as np
 
@@ -253,7 +263,10 @@ class ONNXRuntimeProfiler(BaseProfiler):
                 tracker.start()
                 use_cc_checkpoint = callable(getattr(tracker, "checkpoint", None))
                 if use_cc_checkpoint:
-                    cp_before = tracker.checkpoint()
+                    with concurrent_sampling_workload(
+                        lambda: session.run(output_names, feed)
+                    ):
+                        cp_before = tracker.checkpoint()
                     if cp_before is None:
                         use_cc_checkpoint = False
             except Exception as e:
@@ -272,14 +285,19 @@ class ONNXRuntimeProfiler(BaseProfiler):
             t_window_s = max(time.perf_counter() - t_window0, 1e-12)
             if tracker is not None:
                 try:
-                    if use_cc_checkpoint and cp_before is not None:
-                        cp_after = tracker.checkpoint()
-                        if cp_after is not None:
-                            seg = cp_after.segment_since(cp_before)
-                            delta_kwh = max(float(seg.energy_consumed_kwh), 0.0)
-                            energy_j = float(delta_kwh) * 3_600_000.0
-                            avg_power_w = float(energy_j / t_window_s)
-                    _ = tracker.stop()
+
+                    def _profile_pm_workload() -> None:
+                        session.run(output_names, feed)
+
+                    with concurrent_sampling_workload(_profile_pm_workload):
+                        if use_cc_checkpoint and cp_before is not None:
+                            cp_after = tracker.checkpoint()
+                            if cp_after is not None:
+                                seg = cp_after.segment_since(cp_before)
+                                delta_kwh = max(float(seg.energy_consumed_kwh), 0.0)
+                                energy_j = float(delta_kwh) * 3_600_000.0
+                                avg_power_w = float(energy_j / t_window_s)
+                        _ = tracker.stop()
                     if avg_power_w is None:
                         emissions_data = getattr(tracker, "final_emissions_data", None)
                         if emissions_data is None:
@@ -404,6 +422,9 @@ class ONNXRuntimeProfiler(BaseProfiler):
 
         total_t_window_s = 0.0
         stats: List[Dict[str, Optional[float]]] = []
+        last_pm: Optional[
+            Tuple[Any, List[str], Dict[str, Any]]
+        ] = None  # session, output_names, feed — for powermetrics overlap on tracker.stop()
 
         try:
             for item in prepared:
@@ -416,8 +437,11 @@ class ONNXRuntimeProfiler(BaseProfiler):
                 # warmup only). Otherwise warmup energy is divided by timed-only t_window_s.
                 if power_requested and tracker is not None and not use_cc_checkpoint:
                     try:
-                        if hasattr(tracker, "_measure_power_and_energy"):
-                            tracker._measure_power_and_energy()  # type: ignore[attr-defined]
+                        with concurrent_sampling_workload(
+                            lambda: session.run(output_names, feed)
+                        ):
+                            if hasattr(tracker, "_measure_power_and_energy"):
+                                tracker._measure_power_and_energy()  # type: ignore[attr-defined]
                         total_energy_bw = getattr(tracker, "_total_energy", None)
                         if total_energy_bw is not None:
                             prev_total_energy_kwh = float(
@@ -431,7 +455,10 @@ class ONNXRuntimeProfiler(BaseProfiler):
                 cp_before = None
                 if power_requested and tracker is not None and use_cc_checkpoint:
                     try:
-                        cp_before = tracker.checkpoint()
+                        with concurrent_sampling_workload(
+                            lambda: session.run(output_names, feed)
+                        ):
+                            cp_before = tracker.checkpoint()
                         if cp_before is None:
                             raise RuntimeError("checkpoint() returned None before model window")
                     except Exception as e:
@@ -454,8 +481,13 @@ class ONNXRuntimeProfiler(BaseProfiler):
                 per_model_avg_power_w: Optional[float] = None
                 if power_requested and tracker is not None:
                     try:
+
+                        def _batch_pm_workload() -> None:
+                            session.run(output_names, feed)
+
                         if use_cc_checkpoint and cp_before is not None:
-                            cp_after = tracker.checkpoint()
+                            with concurrent_sampling_workload(_batch_pm_workload):
+                                cp_after = tracker.checkpoint()
                             if cp_after is None:
                                 raise RuntimeError("checkpoint() returned None after model window")
                             seg = cp_after.segment_since(cp_before)
@@ -463,8 +495,9 @@ class ONNXRuntimeProfiler(BaseProfiler):
                             energy_j = float(delta_energy_kwh) * 3_600_000.0
                             per_model_avg_power_w = float(energy_j / t_window_s)
                         else:
-                            if hasattr(tracker, "_measure_power_and_energy"):
-                                tracker._measure_power_and_energy()  # type: ignore[attr-defined]
+                            with concurrent_sampling_workload(_batch_pm_workload):
+                                if hasattr(tracker, "_measure_power_and_energy"):
+                                    tracker._measure_power_and_energy()  # type: ignore[attr-defined]
                             total_energy = getattr(tracker, "_total_energy", None)
                             if total_energy is not None:
                                 curr_total_energy_kwh = float(getattr(total_energy, "kWh", 0.0))
@@ -481,6 +514,7 @@ class ONNXRuntimeProfiler(BaseProfiler):
                             logging.warning(
                                 f"CodeCarbon per-model energy failed; fallback to batch power: {e}"
                             )
+                last_pm = (session, output_names, feed)
                 stats.append(
                     {
                         "avg_ms": avg,
@@ -492,7 +526,16 @@ class ONNXRuntimeProfiler(BaseProfiler):
             avg_power_w: Optional[float] = None
             if tracker is not None:
                 try:
-                    _ = tracker.stop()
+                    if last_pm is not None:
+                        ls, lo, lfeed = last_pm
+
+                        def _stop_pm_workload() -> None:
+                            ls.run(lo, lfeed)
+
+                        with concurrent_sampling_workload(_stop_pm_workload):
+                            _ = tracker.stop()
+                    else:
+                        _ = tracker.stop()
                     emissions_data = getattr(tracker, "final_emissions_data", None)
                     if emissions_data is None:
                         emissions_data = getattr(tracker, "_last_emissions_data", None)
