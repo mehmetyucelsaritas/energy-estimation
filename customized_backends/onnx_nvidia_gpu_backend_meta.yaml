@@ -1,0 +1,5 @@
+builtin_name: onnx_nvidia_gpu
+package_location: /home/mehmet/repo/energy-estimation/customized_backends/onnx_nvidia_gpu
+class_module: backend
+class_name: OnnxNvidiaGpuBackend
+defaultConfigFile: /home/mehmet/repo/energy-estimation/customized_backends/onnx_nvidia_gpu/default_config.yaml
