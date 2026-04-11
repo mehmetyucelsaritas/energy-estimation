@@ -1,0 +1,11 @@
+kernel_name,global_count,missing_count
+conv-bn-relu,50,0
+maxpool,33,0
+dwconv-bn-relu,21,0
+channelshuffle,16,0
+split,13,0
+global-avgpool,10,0
+fc,9,0
+avgpool-reshape,2,2
+fc-relu-fc-relu-fc,2,2
+bnrelu,1,0
