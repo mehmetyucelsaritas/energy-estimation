@@ -1,0 +1,24 @@
+# ONNX Runtime on Linux with NVIDIA GPU (CUDA Execution Provider).
+# Intended for nn-Meter "torch" mode where micro-models are exported to ONNX.
+#
+# Requires a GPU build of ONNX Runtime (e.g. pip install onnxruntime-gpu).
+# If CUDA is unavailable, execution falls back to CPUExecutionProvider.
+
+# Prefer CUDA; set false to force CPU-only comparison
+USE_CUDA_EP: true
+
+# Optional: TensorRT EP if your ORT build includes it and TensorRT is installed
+USE_TENSORRT_EP: false
+
+# Override provider order explicitly, e.g.:
+# EXECUTION_PROVIDERS: CUDAExecutionProvider,CPUExecutionProvider
+
+INTRA_OP_NUM_THREADS: 0
+INTER_OP_NUM_THREADS: 0
+
+WARMUP_RUNS: 10
+NUM_RUNS: 50
+INTER_MODEL_SLEEP_S: 0
+BATCH_SIZE: 1
+
+VERBOSE: false
