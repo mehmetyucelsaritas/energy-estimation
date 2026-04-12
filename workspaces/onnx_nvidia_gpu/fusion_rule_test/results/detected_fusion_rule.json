@@ -1,0 +1,242 @@
+{
+    "BF_add_add": {
+        "obey": true
+    },
+    "BF_add_avgpool": {
+        "obey": true
+    },
+    "BF_add_concat": {
+        "obey": true
+    },
+    "BF_add_conv": {
+        "obey": true
+    },
+    "BF_add_convtrans": {
+        "obey": true
+    },
+    "BF_add_dwconv": {
+        "obey": true
+    },
+    "BF_add_fc": {
+        "obey": true
+    },
+    "BF_add_relu": {
+        "obey": true
+    },
+    "BF_add_reshape": {
+        "obey": true
+    },
+    "BF_avgpool_add": {
+        "obey": true
+    },
+    "BF_avgpool_avgpool": {
+        "obey": false
+    },
+    "BF_avgpool_concat": {
+        "obey": true
+    },
+    "BF_avgpool_conv": {
+        "obey": false
+    },
+    "BF_avgpool_convtrans": {
+        "obey": false
+    },
+    "BF_avgpool_dwconv": {
+        "obey": true
+    },
+    "BF_avgpool_relu": {
+        "obey": true
+    },
+    "BF_avgpool_reshape": {
+        "obey": true
+    },
+    "BF_bn_relu": {
+        "obey": true
+    },
+    "BF_concat_add": {
+        "obey": true
+    },
+    "BF_concat_avgpool": {
+        "obey": true
+    },
+    "BF_concat_concat": {
+        "obey": true
+    },
+    "BF_concat_conv": {
+        "obey": true
+    },
+    "BF_concat_convtrans": {
+        "obey": true
+    },
+    "BF_concat_dwconv": {
+        "obey": true
+    },
+    "BF_concat_fc": {
+        "obey": true
+    },
+    "BF_concat_relu": {
+        "obey": true
+    },
+    "BF_concat_reshape": {
+        "obey": true
+    },
+    "BF_conv_add": {
+        "obey": true
+    },
+    "BF_conv_avgpool": {
+        "obey": true
+    },
+    "BF_conv_bn": {
+        "obey": true
+    },
+    "BF_conv_concat": {
+        "obey": true
+    },
+    "BF_conv_conv": {
+        "obey": true
+    },
+    "BF_conv_convtrans": {
+        "obey": true
+    },
+    "BF_conv_dwconv": {
+        "obey": true
+    },
+    "BF_conv_hswish": {
+        "obey": true
+    },
+    "BF_conv_relu": {
+        "obey": true
+    },
+    "BF_conv_reshape": {
+        "obey": true
+    },
+    "BF_conv_se": {
+        "obey": true
+    },
+    "BF_convtrans_add": {
+        "obey": true
+    },
+    "BF_convtrans_avgpool": {
+        "obey": true
+    },
+    "BF_convtrans_concat": {
+        "obey": true
+    },
+    "BF_convtrans_conv": {
+        "obey": true
+    },
+    "BF_convtrans_convtrans": {
+        "obey": true
+    },
+    "BF_convtrans_dwconv": {
+        "obey": true
+    },
+    "BF_convtrans_relu": {
+        "obey": true
+    },
+    "BF_convtrans_reshape": {
+        "obey": true
+    },
+    "BF_dwconv_add": {
+        "obey": true
+    },
+    "BF_dwconv_avgpool": {
+        "obey": true
+    },
+    "BF_dwconv_bn": {
+        "obey": true
+    },
+    "BF_dwconv_concat": {
+        "obey": true
+    },
+    "BF_dwconv_conv": {
+        "obey": true
+    },
+    "BF_dwconv_convtrans": {
+        "obey": true
+    },
+    "BF_dwconv_dwconv": {
+        "obey": true
+    },
+    "BF_dwconv_relu": {
+        "obey": true
+    },
+    "BF_dwconv_reshape": {
+        "obey": true
+    },
+    "BF_fc_add": {
+        "obey": true
+    },
+    "BF_fc_concat": {
+        "obey": true
+    },
+    "BF_fc_fc": {
+        "obey": true
+    },
+    "BF_fc_relu": {
+        "obey": true
+    },
+    "BF_fc_reshape": {
+        "obey": true
+    },
+    "BF_relu_add": {
+        "obey": true
+    },
+    "BF_relu_avgpool": {
+        "obey": true
+    },
+    "BF_relu_concat": {
+        "obey": true
+    },
+    "BF_relu_conv": {
+        "obey": true
+    },
+    "BF_relu_convtrans": {
+        "obey": true
+    },
+    "BF_relu_dwconv": {
+        "obey": true
+    },
+    "BF_relu_fc": {
+        "obey": true
+    },
+    "BF_relu_relu": {
+        "obey": true
+    },
+    "BF_relu_reshape": {
+        "obey": true
+    },
+    "BF_reshape_add": {
+        "obey": true
+    },
+    "BF_reshape_avgpool": {
+        "obey": true
+    },
+    "BF_reshape_concat": {
+        "obey": true
+    },
+    "BF_reshape_conv": {
+        "obey": true
+    },
+    "BF_reshape_convtrans": {
+        "obey": true
+    },
+    "BF_reshape_dwconv": {
+        "obey": true
+    },
+    "BF_reshape_fc": {
+        "obey": true
+    },
+    "BF_reshape_relu": {
+        "obey": true
+    },
+    "BF_reshape_reshape": {
+        "obey": true
+    },
+    "BF_se_relu": {
+        "obey": true
+    },
+    "MON": {
+        "obey": true
+    }
+}
