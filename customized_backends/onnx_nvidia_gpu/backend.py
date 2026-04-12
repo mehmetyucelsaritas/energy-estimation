@@ -4,6 +4,7 @@
 
 import logging
 import os
+import site
 import sys
 
 from nn_meter.builder.backends import BaseBackend
@@ -16,6 +17,46 @@ if _customized not in sys.path:
 from onnx_mac_m4.backend import ONNXMacBackend
 
 logging = logging.getLogger("nn-Meter")
+
+
+def _ensure_nvidia_pip_cuda_libs_on_ld_path():
+    """Let ONNX Runtime's CUDA EP find libcublasLt / cuDNN / curand from pip `nvidia-*-cu12` wheels.
+
+    onnxruntime-gpu 1.19+ expects CUDA 12.x and cuDNN 9.x at load time. A matching PyTorch wheel
+    can satisfy that, but older stacks (e.g. torch+cu102) do not; install
+    ``docs/requirements/onnxruntime_gpu_cuda12_linux.txt`` and this prepends those ``lib`` dirs
+    before the first ``import onnxruntime``.
+    """
+    bases = []
+    if hasattr(site, "getsitepackages"):
+        bases.extend(site.getsitepackages())
+    user_sp = getattr(site, "getusersitepackages", lambda: None)()
+    if user_sp:
+        bases.append(user_sp)
+    ver = f"{sys.version_info.major}.{sys.version_info.minor}"
+    bases.append(os.path.join(sys.prefix, "lib", f"python{ver}", "site-packages"))
+
+    lib_dirs = []
+    seen = set()
+    for base in bases:
+        if not base or not os.path.isdir(base):
+            continue
+        nvidia_root = os.path.join(base, "nvidia")
+        if not os.path.isdir(nvidia_root):
+            continue
+        for name in sorted(os.listdir(nvidia_root)):
+            lib = os.path.join(nvidia_root, name, "lib")
+            if os.path.isdir(lib) and lib not in seen:
+                seen.add(lib)
+                lib_dirs.append(lib)
+    if not lib_dirs:
+        return
+    prefix = ":".join(lib_dirs)
+    cur = os.environ.get("LD_LIBRARY_PATH", "")
+    os.environ["LD_LIBRARY_PATH"] = prefix + (":" + cur if cur else "")
+
+
+_ensure_nvidia_pip_cuda_libs_on_ld_path()
 
 
 def _truthy(value) -> bool:

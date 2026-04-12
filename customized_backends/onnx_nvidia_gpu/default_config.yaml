@@ -1,8 +1,11 @@
 # ONNX Runtime on Linux with NVIDIA GPU (CUDA Execution Provider).
 # Intended for nn-Meter "torch" mode where micro-models are exported to ONNX.
 #
-# Requires a GPU build of ONNX Runtime (e.g. pip install onnxruntime-gpu).
-# If CUDA is unavailable, execution falls back to CPUExecutionProvider.
+# Requires: pip install onnxruntime-gpu
+# Plus CUDA 12 + cuDNN 9 *shared libraries* (PyTorch 2.4+ cu12 bundles them; older torch does not).
+# Easiest fix: pip install -r docs/requirements/onnxruntime_gpu_cuda12_linux.txt
+# OnnxNvidiaGpuBackend prepends those pip nvidia/*/lib dirs to LD_LIBRARY_PATH automatically.
+# If CUDA still fails, fall back to CPUExecutionProvider.
 
 # Prefer CUDA; set false to force CPU-only comparison
 USE_CUDA_EP: true
