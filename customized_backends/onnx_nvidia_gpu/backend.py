@@ -6,6 +6,8 @@ import logging
 import os
 import site
 import sys
+import glob
+import ctypes
 
 from nn_meter.builder.backends import BaseBackend
 
@@ -19,14 +21,8 @@ from onnx_mac_m4.backend import ONNXMacBackend
 logging = logging.getLogger("nn-Meter")
 
 
-def _ensure_nvidia_pip_cuda_libs_on_ld_path():
-    """Let ONNX Runtime's CUDA EP find libcublasLt / cuDNN / curand from pip `nvidia-*-cu12` wheels.
-
-    onnxruntime-gpu 1.19+ expects CUDA 12.x and cuDNN 9.x at load time. A matching PyTorch wheel
-    can satisfy that, but older stacks (e.g. torch+cu102) do not; install
-    ``docs/requirements/onnxruntime_gpu_cuda12_linux.txt`` and this prepends those ``lib`` dirs
-    before the first ``import onnxruntime``.
-    """
+def _collect_nvidia_pip_cuda_lib_dirs():
+    """Collect nvidia/*/lib directories from active Python site-packages."""
     bases = []
     if hasattr(site, "getsitepackages"):
         bases.extend(site.getsitepackages())
@@ -49,11 +45,66 @@ def _ensure_nvidia_pip_cuda_libs_on_ld_path():
             if os.path.isdir(lib) and lib not in seen:
                 seen.add(lib)
                 lib_dirs.append(lib)
+    return lib_dirs
+
+
+def _prepend_on_linux_ld_library_path(lib_dirs):
+    if not lib_dirs or sys.platform != "linux":
+        return
+    cur = os.environ.get("LD_LIBRARY_PATH", "")
+    cur_entries = [p for p in cur.split(":") if p]
+    merged = []
+    seen = set()
+    for p in lib_dirs + cur_entries:
+        if p not in seen:
+            seen.add(p)
+            merged.append(p)
+    os.environ["LD_LIBRARY_PATH"] = ":".join(merged)
+
+
+def _preload_nvidia_cuda_libs(lib_dirs):
+    """Preload CUDA libs so ORT CUDA EP can resolve dependencies in-process.
+
+    Updating LD_LIBRARY_PATH after process start can be too late for dynamic linking on Linux.
+    Loading likely dependencies via absolute paths avoids repeated CUDAExecutionProvider failures.
+    """
+    if not lib_dirs or sys.platform != "linux":
+        return
+    patterns = [
+        "libcublasLt.so*",
+        "libcublas.so*",
+        "libcudnn.so*",
+        "libcurand.so*",
+        "libcufft.so*",
+        "libcudart.so*",
+        "libnvrtc.so*",
+    ]
+    candidates = []
+    seen = set()
+    for pattern in patterns:
+        for d in lib_dirs:
+            for path in sorted(glob.glob(os.path.join(d, pattern)), reverse=True):
+                if path not in seen:
+                    seen.add(path)
+                    candidates.append(path)
+    if not candidates:
+        return
+    mode = getattr(ctypes, "RTLD_GLOBAL", 0)
+    for path in candidates:
+        try:
+            ctypes.CDLL(path, mode=mode)
+        except OSError:
+            # Best effort: some entries are symlinks or version variants not present in this stack.
+            continue
+
+
+def _ensure_nvidia_pip_cuda_libs_on_ld_path():
+    """Expose pip CUDA libs (cu11/cu12) for ONNX Runtime CUDA/TensorRT providers."""
+    lib_dirs = _collect_nvidia_pip_cuda_lib_dirs()
     if not lib_dirs:
         return
-    prefix = ":".join(lib_dirs)
-    cur = os.environ.get("LD_LIBRARY_PATH", "")
-    os.environ["LD_LIBRARY_PATH"] = prefix + (":" + cur if cur else "")
+    _prepend_on_linux_ld_library_path(lib_dirs)
+    _preload_nvidia_cuda_libs(lib_dirs)
 
 
 _ensure_nvidia_pip_cuda_libs_on_ld_path()
