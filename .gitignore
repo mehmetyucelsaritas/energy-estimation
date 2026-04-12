@@ -50,6 +50,7 @@ docs/_build/
 # onnx models
 *.onnx
 nn_meter_onnx_workspace/predictor_build/results/*
+workspaces/onnx_nvidia_gpu/predictor_build/results/*
 
 IDE related
 .vscode/*
