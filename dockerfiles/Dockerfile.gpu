@@ -1,0 +1,24 @@
+# syntax=docker/dockerfile:1.6
+FROM python:3.10-slim
+
+ARG UID=1000
+ARG GID=1000
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
+
+WORKDIR /workspace/energy-estimation
+
+# Cache-friendly dependency layer. Source code is bind-mounted at runtime.
+COPY dockerfiles/requirements.docker.txt /tmp/requirements.docker.txt
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --upgrade pip \
+    && pip install -r /tmp/requirements.docker.txt
+
+RUN groupadd -g ${GID} mehmet \
+    && useradd -m -u ${UID} -g ${GID} -s /bin/bash mehmet
+
+USER mehmet
+
+CMD ["python", "build_nvidia_latency_predictor.py"]

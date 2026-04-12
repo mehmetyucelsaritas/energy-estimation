@@ -1,0 +1,21 @@
+services:
+  energy-estimation:
+    build:
+      context: ..
+      dockerfile: dockerfiles/Dockerfile.gpu
+      args:
+        UID: "${UID:-1000}"
+        GID: "${GID:-1000}"
+    image: energy-estimation:gpu-dev
+    container_name: energy-estimation-gpu0
+    user: "0:0"
+    working_dir: /workspace/energy-estimation
+    volumes:
+      - ../:/workspace/energy-estimation
+    environment:
+      NVIDIA_VISIBLE_DEVICES: "0"
+      CUDA_VISIBLE_DEVICES: "0"
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+      PYTHONPATH: /workspace/energy-estimation
+    gpus: all
+    command: bash /workspace/energy-estimation/dockerfiles/docker_entrypoint.sh

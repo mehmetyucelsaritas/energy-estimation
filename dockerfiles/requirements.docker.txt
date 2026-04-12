@@ -1,0 +1,22 @@
+--extra-index-url https://download.pytorch.org/whl/cu121
+numpy
+pandas
+tqdm
+networkx
+requests
+protobuf
+PyYAML
+scikit-learn
+packaging
+jsonlines
+onnx==1.17.0
+onnxruntime-gpu==1.19.2
+torch==2.5.1+cu121
+torchvision==0.20.1+cu121
+codecarbon==3.2.3
+importlib-resources==6.4.5
+nvidia-cuda-runtime-cu12
+nvidia-cublas-cu12
+nvidia-cudnn-cu12>=9,<10
+nvidia-curand-cu12
+nvidia-cufft-cu12
