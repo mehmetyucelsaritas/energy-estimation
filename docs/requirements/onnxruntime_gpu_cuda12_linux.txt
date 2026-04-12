@@ -1,0 +1,12 @@
+# CUDA 12 runtime libraries for onnxruntime-gpu 1.19+ on Linux (PyPI wheels).
+# Install into the same Python env as onnxruntime-gpu, then either:
+#   - rely on OnnxNvidiaGpuBackend (prepends these dirs to LD_LIBRARY_PATH), or
+#   - export LD_LIBRARY_PATH yourself (see docs below).
+#
+#   pip install -r docs/requirements/onnxruntime_gpu_cuda12_linux.txt
+
+nvidia-cuda-runtime-cu12
+nvidia-cublas-cu12
+nvidia-cudnn-cu12>=9,<10
+nvidia-curand-cu12
+nvidia-cufft-cu12
