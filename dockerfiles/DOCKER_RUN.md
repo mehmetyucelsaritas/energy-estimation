@@ -27,6 +27,21 @@ Behavior:
 - If image `energy-estimation:gpu-dev` exists, it runs with `--no-build`.
 - If image does not exist, it builds first, then runs.
 
+## Run Detached (recommended for SSH sessions)
+
+Use this mode when connected to a remote host over SSH and you want the container to keep running after disconnecting:
+
+```bash
+docker compose -f dockerfiles/docker-compose.gpu.yml up -d energy-estimation
+```
+
+After reconnecting:
+
+```bash
+docker ps
+docker logs -f energy-estimation-gpu0
+```
+
 ## Rebuild (only when needed)
 
 Use rebuild when major container changes happen:
