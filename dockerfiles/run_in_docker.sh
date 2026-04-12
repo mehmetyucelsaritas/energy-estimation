@@ -6,6 +6,8 @@ COMPOSE_FILE="${SCRIPT_DIR}/docker-compose.gpu.yml"
 SERVICE="energy-estimation"
 IMAGE="energy-estimation:gpu-dev"
 CONTAINER_NAME="energy-estimation-gpu0"
+HOST_UID="$(id -u)"
+HOST_GID="$(id -g)"
 REBUILD=false
 DETACHED=false
 
@@ -31,23 +33,23 @@ fi
 
 if [[ "${REBUILD}" == "true" ]]; then
   if [[ "${DETACHED}" == "true" ]]; then
-    docker compose -f "${COMPOSE_FILE}" up --build -d "${SERVICE}"
+    HOST_UID="${HOST_UID}" HOST_GID="${HOST_GID}" docker compose -f "${COMPOSE_FILE}" up --build -d "${SERVICE}"
   else
-    docker compose -f "${COMPOSE_FILE}" up --build --abort-on-container-exit "${SERVICE}"
+    HOST_UID="${HOST_UID}" HOST_GID="${HOST_GID}" docker compose -f "${COMPOSE_FILE}" up --build --abort-on-container-exit "${SERVICE}"
   fi
   exit 0
 fi
 
 if docker image inspect "${IMAGE}" >/dev/null 2>&1; then
   if [[ "${DETACHED}" == "true" ]]; then
-    docker compose -f "${COMPOSE_FILE}" up --no-build -d "${SERVICE}"
+    HOST_UID="${HOST_UID}" HOST_GID="${HOST_GID}" docker compose -f "${COMPOSE_FILE}" up --no-build -d "${SERVICE}"
   else
-    docker compose -f "${COMPOSE_FILE}" up --no-build --abort-on-container-exit "${SERVICE}"
+    HOST_UID="${HOST_UID}" HOST_GID="${HOST_GID}" docker compose -f "${COMPOSE_FILE}" up --no-build --abort-on-container-exit "${SERVICE}"
   fi
 else
   if [[ "${DETACHED}" == "true" ]]; then
-    docker compose -f "${COMPOSE_FILE}" up --build -d "${SERVICE}"
+    HOST_UID="${HOST_UID}" HOST_GID="${HOST_GID}" docker compose -f "${COMPOSE_FILE}" up --build -d "${SERVICE}"
   else
-    docker compose -f "${COMPOSE_FILE}" up --build --abort-on-container-exit "${SERVICE}"
+    HOST_UID="${HOST_UID}" HOST_GID="${HOST_GID}" docker compose -f "${COMPOSE_FILE}" up --build --abort-on-container-exit "${SERVICE}"
   fi
 fi

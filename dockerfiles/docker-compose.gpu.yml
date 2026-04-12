@@ -4,15 +4,16 @@ services:
       context: ..
       dockerfile: dockerfiles/Dockerfile.gpu
       args:
-        UID: "${UID:-1000}"
-        GID: "${GID:-1000}"
+        UID: "${HOST_UID:-1000}"
+        GID: "${HOST_GID:-1000}"
     image: energy-estimation:gpu-dev
     container_name: energy-estimation-gpu0
-    user: "0:0"
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
     working_dir: /workspace/energy-estimation
     volumes:
       - ../:/workspace/energy-estimation
     environment:
+      HOME: /tmp
       NVIDIA_VISIBLE_DEVICES: "0"
       CUDA_VISIBLE_DEVICES: "0"
       NVIDIA_DRIVER_CAPABILITIES: compute,utility
