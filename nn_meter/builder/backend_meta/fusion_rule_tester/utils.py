@@ -142,10 +142,11 @@ def generate_single_model(op, input_shape, config, implement):
 
 def save_model(model, model_path, implement):
     if implement == 'tensorflow':
-        from tensorflow import keras
         from nn_meter.builder.nn_modules.tf_networks.utils import get_tensor_by_shapes
         model['model'](get_tensor_by_shapes(model['shapes']))
-        keras.models.save_model(model['model'], model_path)
+        # Export SavedModel to keep compatibility across Keras versions and
+        # avoid custom-class deserialization issues.
+        model['model'].export(model_path)
         return model_path
 
     elif implement == 'torch':

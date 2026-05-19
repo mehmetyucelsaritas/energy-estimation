@@ -116,6 +116,7 @@ class TFLiteGPULatencyParser(BaseParser):
 
     def _parse_comp_time(self, content):
         comp_time_regex = r'comp_avg_ms=([\d.\+e-]+) comp_std_ms=([\d.\+e-]+)'
+        inference_avg_us_regex = r'Inference \(avg\):\s*([\d.\+e-]+)'
         comp_avg, comp_std = 0, 0
 
         for line in content.splitlines():
@@ -123,6 +124,14 @@ class TFLiteGPULatencyParser(BaseParser):
             if match:
                 comp_avg = float(match[1])
                 comp_std = float(match[2])
+                return comp_avg, comp_std
+            # Newer benchmark_model output reports only inference average in us.
+            # For GPU parsing, treat std as 0 and convert us -> ms.
+            match = re.search(inference_avg_us_regex, line)
+            if match:
+                comp_avg = float(match[1]) / 1000.0
+                comp_std = 0
+                return comp_avg, comp_std
 
         return comp_avg, comp_std
 

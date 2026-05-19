@@ -28,12 +28,19 @@ class TFLiteBackend(BaseBackend):
         """
         import tensorflow as tf
         model_name = get_filename_without_ext(model_path)
-        model = tf.keras.models.load_model(model_path)
-        converter = tf.lite.TFLiteConverter.from_keras_model(model)
+        if os.path.isdir(model_path):
+            converter = tf.lite.TFLiteConverter.from_saved_model(model_path)
+        else:
+            model = tf.keras.models.load_model(model_path)
+            converter = tf.lite.TFLiteConverter.from_keras_model(model)
         tflite_model = converter.convert()
         converted_model = os.path.join(save_path, model_name + '.tflite')
         open(converted_model, 'wb').write(tflite_model)
-        shutil.rmtree(model_path)
+        # Intermediate source can be either a directory (SavedModel) or a file (e.g., .keras).
+        if os.path.isdir(model_path):
+            shutil.rmtree(model_path)
+        elif os.path.isfile(model_path):
+            os.remove(model_path)
         return converted_model
 
     def test_connection(self):
