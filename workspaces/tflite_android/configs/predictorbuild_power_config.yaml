@@ -1,5 +1,8 @@
+# Predictor build settings for kernel *power* (watts) predictors.
+# Latency training uses predictorbuild_config.yaml; edit this file independently
+# for power-specific kernel lists and sampling budgets.
 DETAIL: FALSE
-IMPLEMENT: torch
+IMPLEMENT: tensorflow
 BATCH_SIZE: 1
 KERNELS:
   conv-bn-relu:

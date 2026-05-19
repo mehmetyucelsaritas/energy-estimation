@@ -72,7 +72,7 @@
         "obey": true
     },
     "BF_concat_fc": {
-        "obey": true
+        "obey": false
     },
     "BF_concat_relu": {
         "obey": true
@@ -129,10 +129,10 @@
         "obey": false
     },
     "BF_convtrans_dwconv": {
-        "obey": false
+        "obey": true
     },
     "BF_convtrans_relu": {
-        "obey": true
+        "obey": false
     },
     "BF_convtrans_reshape": {
         "obey": false
@@ -168,7 +168,7 @@
         "obey": true
     },
     "BF_fc_concat": {
-        "obey": false
+        "obey": true
     },
     "BF_fc_fc": {
         "obey": true

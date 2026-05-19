@@ -1,0 +1,4 @@
+REMOTE_MODEL_DIR: /data/local/tmp/nn_meter_models
+BENCHMARK_MODEL_PATH: /data/local/tmp/benchmark_model
+DEVICE_SERIAL: 56040DLAQ004TS
+KERNEL_PATH: /data/local/tmp/nn_meter_kernels

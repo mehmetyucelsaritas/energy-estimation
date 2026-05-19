@@ -1,0 +1,31 @@
+# Local macOS backend (Apple Silicon friendly) using ONNX Runtime.
+#
+# This backend is intended for nn-Meter "torch" implementation mode where
+# generated kernel micro-models are exported to ONNX already.
+#
+# Notes:
+# - If `USE_COREML_EP` is true and ORT has CoreML EP available, it will be used.
+# - Otherwise it falls back to CPUExecutionProvider automatically.
+
+# Force CPU-only execution for this workspace.
+EXECUTION_PROVIDERS: CPUExecutionProvider
+USE_COREML_EP: false
+
+# Threading controls (CPU EP + some shared ORT settings)
+INTRA_OP_NUM_THREADS: 0     # 0 => ORT default
+INTER_OP_NUM_THREADS: 0     # 0 => ORT default
+
+# Benchmark settings (inference timing)
+WARMUP_RUNS: 5
+NUM_RUNS: 20
+# Seconds to sleep after each profiled model (default 0.2 elsewhere). Use 0 for local ONNX to avoid ~100s idle on 500 samples.
+INTER_MODEL_SLEEP_S: 0
+BATCH_SIZE: 1
+
+# If true, include ORT provider list in profiler output
+VERBOSE: false
+# Batch power (build_power_predictor): legacy fast path uses two samples/model (post-warmup +
+# post-timed) so avg_power matches checkpoint window; optional checkpoint() mode if available.
+# Set false to use checkpoint segments when your CodeCarbon build supports checkpoint().
+POWER_FAST_LEGACY_DELTA: true
+POWER_BATCH_CHUNK_SIZE: 50
