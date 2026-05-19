@@ -54,3 +54,7 @@ workspaces/onnx_nvidia_gpu/predictor_build/results/*
 
 IDE related
 .vscode/*
+experiments/*
+**/predictor_build/*
+**/testcases/*
+workspaces/tflite_android/benchmark_model_cpu_gpu_v2.7.tflite
