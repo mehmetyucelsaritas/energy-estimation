@@ -116,7 +116,9 @@ def profile_models(backend, models, mode = 'ruletest', metrics = ["latency"], sa
 
     **kwargs: arguments for profiler, such as `taskset` and `close_xnnpack` in TFLite profiler
     """
-    signal.signal(signal.SIGALRM, handle_timeout)
+    has_sigalrm = hasattr(signal, "SIGALRM")
+    if has_sigalrm:
+        signal.signal(signal.SIGALRM, handle_timeout)
     if isinstance(models, str):
         with open(models, 'r') as fp:
             models = json.load(fp)
@@ -242,9 +244,11 @@ def profile_models(backend, models, mode = 'ruletest', metrics = ["latency"], sa
             if have_converted: # the models have been converted for the backend
                 try:
                     model_path = model['converted_model']
-                    signal.alarm(time_threshold)
+                    if has_sigalrm:
+                        signal.alarm(time_threshold)
                     profiled_res = backend.profile(model_path, metrics, input_shape=model['shapes'], **kwargs)
-                    signal.alarm(0)
+                    if has_sigalrm:
+                        signal.alarm(0)
                     for metric in metrics:
                         model[metric] = profiled_res[metric]
                     if inter_model_sleep_s > 0:
@@ -255,9 +259,11 @@ def profile_models(backend, models, mode = 'ruletest', metrics = ["latency"], sa
             else: # the models have not been converted
                 try:
                     model_path = model['model']
-                    signal.alarm(time_threshold)
+                    if has_sigalrm:
+                        signal.alarm(time_threshold)
                     profiled_res = backend.profile_model_file(model_path, model_save_path or os.path.dirname(model_path), input_shape=model['shapes'], metrics=metrics, **kwargs)
-                    signal.alarm(0)
+                    if has_sigalrm:
+                        signal.alarm(0)
                     for metric in metrics:
                         model[metric] = profiled_res[metric]
                     if inter_model_sleep_s > 0:
@@ -478,3 +484,186 @@ def build_power_predictor(backend):
             predbuild_config_module='predbuild_power',
             max_error_configs=max_error_configs,
             )
+
+
+def build_energy_predictor(backend):
+    """Build energy predictor for all kernels in `<workspace-path>/configs/predictorbuild_power_config.yaml`."""
+    kernels = builder_config.get("KERNELS", 'predbuild_power')
+
+    for kernel_type in kernels:
+        init_sample_num = kernels[kernel_type]["INIT_SAMPLE_NUM"]
+        finegrained_sample_num = kernels[kernel_type]["FINEGRAINED_SAMPLE_NUM"]
+        iteration = kernels[kernel_type]["ITERATION"]
+        error_threshold = kernels[kernel_type]["ERROR_THRESHOLD"]
+        max_error_configs = kernels[kernel_type].get("MAX_ERROR_CONFIGS", None)
+        build_predictor_for_kernel(
+            kernel_type, backend,
+            init_sample_num=init_sample_num,
+            finegrained_sample_num=finegrained_sample_num,
+            iteration=iteration,
+            error_threshold=error_threshold,
+            predict_label="energy",
+            metrics=["energy"],
+            result_subdir="energy",
+            predbuild_config_module='predbuild_power',
+            max_error_configs=max_error_configs,
+            )
+
+
+def _merge_error_config_lists(*config_lists):
+    merged = []
+    seen = set()
+    for cfg_list in config_lists:
+        if not cfg_list:
+            continue
+        for cfg in cfg_list:
+            try:
+                key = json.dumps(cfg, sort_keys=True)
+            except TypeError:
+                key = str(cfg)
+            if key not in seen:
+                seen.add(key)
+                merged.append(cfg)
+    return merged
+
+
+def build_latency_energy_predictor_for_kernel(
+    kernel_type,
+    backend,
+    init_sample_num=1000,
+    finegrained_sample_num=10,
+    iteration=5,
+    latency_error_threshold=0.1,
+    energy_error_threshold=0.1,
+    mark="",
+    max_error_configs=None,
+    predbuild_config_module='predbuild',
+    shared_profile_subdir="latency_energy",
+):
+    """Build latency and energy predictors from one shared profiling pass per iteration."""
+    from nn_meter.builder.kernel_predictor_builder import build_predictor_by_data
+
+    latency_workspace = builder_config.get('WORKSPACE', predbuild_config_module)
+    energy_workspace = latency_workspace
+    latency_save_path = os.path.join(latency_workspace, "results", "latency")
+    energy_save_path = os.path.join(energy_workspace, "results", "energy")
+    mark_suffix = mark if mark == "" else "_" + mark
+
+    kernel_data = sample_and_profile_kernel_data(
+        kernel_type,
+        init_sample_num,
+        backend,
+        sampling_mode='prior',
+        mark=f'prior{mark_suffix}',
+        metrics=["latency", "energy"],
+        result_subdir=shared_profile_subdir,
+        predbuild_config_module=predbuild_config_module,
+    )
+
+    latency_predictor, latency_acc10, latency_error_cfgs = build_predictor_by_data(
+        kernel_type,
+        kernel_data,
+        backend,
+        error_threshold=latency_error_threshold,
+        mark=f'prior{mark_suffix}',
+        save_path=latency_save_path,
+        predict_label="latency",
+    )
+    energy_predictor, energy_acc10, energy_error_cfgs = build_predictor_by_data(
+        kernel_type,
+        kernel_data,
+        backend,
+        error_threshold=energy_error_threshold,
+        mark=f'prior{mark_suffix}',
+        save_path=energy_save_path,
+        predict_label="energy",
+    )
+    logging.keyinfo(
+        f'Iteration 0: latency_acc10 {latency_acc10}, energy_acc10 {energy_acc10}, '
+        f'latency_error_configs {len(latency_error_cfgs)}, energy_error_configs {len(energy_error_cfgs)}'
+    )
+
+    for i in range(1, iteration):
+        iter_error_cfgs = _merge_error_config_lists(latency_error_cfgs, energy_error_cfgs)
+        if (
+            max_error_configs is not None
+            and isinstance(iter_error_cfgs, list)
+            and len(iter_error_cfgs) > int(max_error_configs)
+        ):
+            rng = random.Random(10 + i)
+            iter_error_cfgs = rng.sample(iter_error_cfgs, int(max_error_configs))
+
+        new_kernel_data = sample_and_profile_kernel_data(
+            kernel_type,
+            finegrained_sample_num,
+            backend,
+            sampling_mode='finegrained',
+            configs=iter_error_cfgs,
+            mark=f'finegrained{i}{mark_suffix}',
+            metrics=["latency", "energy"],
+            result_subdir=shared_profile_subdir,
+            predbuild_config_module=predbuild_config_module,
+        )
+        kernel_data = merge_info(new_info=new_kernel_data, prev_info=kernel_data)
+
+        latency_predictor, latency_acc10, latency_error_cfgs = build_predictor_by_data(
+            kernel_type,
+            kernel_data,
+            backend,
+            error_threshold=latency_error_threshold,
+            mark=f'finegrained{i}{mark_suffix}',
+            save_path=latency_save_path,
+            predict_label="latency",
+        )
+        energy_predictor, energy_acc10, energy_error_cfgs = build_predictor_by_data(
+            kernel_type,
+            kernel_data,
+            backend,
+            error_threshold=energy_error_threshold,
+            mark=f'finegrained{i}{mark_suffix}',
+            save_path=energy_save_path,
+            predict_label="energy",
+        )
+        logging.keyinfo(
+            f'Iteration {i}: latency_acc10 {latency_acc10}, energy_acc10 {energy_acc10}, '
+            f'latency_error_configs {len(latency_error_cfgs)}, energy_error_configs {len(energy_error_cfgs)}'
+        )
+
+    return (latency_predictor, energy_predictor), kernel_data
+
+
+def build_latency_energy_predictor_single_pass(backend):
+    """Build latency and energy predictors with shared profiling runs.
+
+    This single-pass flow uses only `<workspace>/configs/predictorbuild_config.yaml`.
+    Optional per-kernel energy threshold can be set with `ENERGY_ERROR_THRESHOLD`.
+    """
+    kernels = builder_config.get("KERNELS", 'predbuild') or {}
+
+    for kernel_type, kernel_cfg in kernels.items():
+        init_sample_num = kernel_cfg.get("INIT_SAMPLE_NUM", 0)
+        finegrained_sample_num = kernel_cfg.get("FINEGRAINED_SAMPLE_NUM", 0)
+        iteration = kernel_cfg.get("ITERATION", 0)
+        latency_error_threshold = kernel_cfg.get("ERROR_THRESHOLD", 0.1)
+        energy_error_threshold = kernel_cfg.get("ENERGY_ERROR_THRESHOLD", latency_error_threshold)
+        max_error_configs = kernel_cfg.get("MAX_ERROR_CONFIGS", None)
+
+        if init_sample_num <= 0 or finegrained_sample_num < 0 or iteration <= 0:
+            logging.warning(
+                f"Skip kernel {kernel_type}: invalid sampling params "
+                f"(init={init_sample_num}, fine={finegrained_sample_num}, iter={iteration})"
+            )
+            continue
+
+        build_latency_energy_predictor_for_kernel(
+            kernel_type=kernel_type,
+            backend=backend,
+            init_sample_num=init_sample_num,
+            finegrained_sample_num=finegrained_sample_num,
+            iteration=iteration,
+            latency_error_threshold=latency_error_threshold,
+            energy_error_threshold=energy_error_threshold,
+            max_error_configs=max_error_configs,
+            predbuild_config_module='predbuild',
+            shared_profile_subdir="latency_energy",
+        )
