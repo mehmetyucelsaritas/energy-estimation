@@ -1,0 +1,460 @@
+block: Failed to parse IDP runner output:
+CPU cluster: all
+==== ONNX MODEL BENCHMARK ====
+Model: BF_add_add_block.onnx
+Provider: CPU
+Operation: unknown, Dimensions: 64x224x224->64
+Execution: 1s warmup + 0s silent + 5s benchmark = 6s total
+
+Model input rank: 4
+Input: Random initialized
+Using 2 input tensors (for Add/Mul operations)
+Starting execution...
+Phase 1: Warmup (1 seconds)...
+ERROR: Failed during warmup: Non-zero status code returned while running Add node. Name:'Add_1' Status Message: /onnxruntime_src/include/onnxruntime/core/fr
+block: Failed to parse IDP runner output:
+CPU cluster: all
+==== ONNX MODEL BENCHMARK ====
+Model: BF_add_concat_block.onnx
+Provider: CPU
+Operation: unknown, Dimensions: 64x224x224->64
+Execution: 1s warmup + 0s silent + 5s benchmark = 6s total
+
+Model input rank: 4
+Input: Random initialized
+Using 2 input tensors (for Add/Mul operations)
+Starting execution...
+Phase 1: Warmup (1 seconds)...
+ERROR: Failed during warmup: Non-zero status code returned while running Concat node. Name:'Concat_1' Status Message: /onnxruntime_src/include/onnxruntim
+block: Failed to parse IDP runner output:
+CPU cluster: all
+==== ONNX MODEL BENCHMARK ====
+Model: BF_avgpool_add_block.onnx
+Provider: CPU
+Operation: unknown, Dimensions: 64x224x224->64
+Execution: 1s warmup + 0s silent + 5s benchmark = 6s total
+
+Model input rank: 4
+Input: Random initialized
+Using 2 input tensors (for Add/Mul operations)
+Starting execution...
+Phase 1: Warmup (1 seconds)...
+ERROR: Failed during warmup: Got invalid dimensions for input: input_1 for the following indices
+ index: 2 Got: 28 Expected: 14
+ index: 3 Got: 28 Expect
+block: Failed to parse IDP runner output:
+CPU cluster: all
+==== ONNX MODEL BENCHMARK ====
+Model: BF_avgpool_concat_block.onnx
+Provider: CPU
+Operation: unknown, Dimensions: 64x224x224->64
+Execution: 1s warmup + 0s silent + 5s benchmark = 6s total
+
+Model input rank: 4
+Input: Random initialized
+Using 2 input tensors (for Add/Mul operations)
+Starting execution...
+Phase 1: Warmup (1 seconds)...
+ERROR: Failed during warmup: Got invalid dimensions for input: input_1 for the following indices
+ index: 2 Got: 28 Expected: 14
+ index: 3 Got: 28 Exp
+block: Failed to parse IDP runner output:
+CPU cluster: all
+==== ONNX MODEL BENCHMARK ====
+Model: BF_concat_add_block.onnx
+Provider: CPU
+Operation: unknown, Dimensions: 64x224x224->64
+Execution: 1s warmup + 0s silent + 5s benchmark = 6s total
+
+Model input rank: 4
+Input: Random initialized
+Using 2 input tensors (for Add/Mul operations)
+Starting execution...
+Phase 1: Warmup (1 seconds)...
+ERROR: Failed during warmup: Non-zero status code returned while running Add node. Name:'Add_1' Status Message: /onnxruntime_src/include/onnxruntime/core
+block: Failed to parse IDP runner output:
+CPU cluster: all
+==== ONNX MODEL BENCHMARK ====
+Model: BF_concat_concat_block.onnx
+Provider: CPU
+Operation: unknown, Dimensions: 64x224x224->64
+Execution: 1s warmup + 0s silent + 5s benchmark = 6s total
+
+Model input rank: 4
+Input: Random initialized
+Using 2 input tensors (for Add/Mul operations)
+Starting execution...
+Phase 1: Warmup (1 seconds)...
+ERROR: Failed during warmup: Non-zero status code returned while running Concat node. Name:'Concat_1' Status Message: /onnxruntime_src/include/onnxrun
+block: Failed to parse IDP runner output:
+CPU cluster: all
+==== ONNX MODEL BENCHMARK ====
+Model: BF_conv_add_block.onnx
+Provider: CPU
+Operation: unknown, Dimensions: 64x224x224->64
+Execution: 1s warmup + 0s silent + 5s benchmark = 6s total
+
+Model input rank: 4
+Input: Random initialized
+Using 2 input tensors (for Add/Mul operations)
+Starting execution...
+Phase 1: Warmup (1 seconds)...
+ERROR: Failed during warmup: Got invalid dimensions for input: input_1 for the following indices
+ index: 1 Got: 64 Expected: 128
+ Please fix either the inp
+block: Failed to parse IDP runner output:
+CPU cluster: all
+==== ONNX MODEL BENCHMARK ====
+Model: BF_conv_concat_block.onnx
+Provider: CPU
+Operation: unknown, Dimensions: 64x224x224->64
+Execution: 1s warmup + 0s silent + 5s benchmark = 6s total
+
+Model input rank: 4
+Input: Random initialized
+Using 2 input tensors (for Add/Mul operations)
+Starting execution...
+Phase 1: Warmup (1 seconds)...
+ERROR: Failed during warmup: Got invalid dimensions for input: input_1 for the following indices
+ index: 1 Got: 64 Expected: 128
+ Please fix either the 
+block: Failed to parse IDP runner output:
+CPU cluster: all
+==== ONNX MODEL BENCHMARK ====
+Model: BF_convtrans_add_block.onnx
+Provider: CPU
+Operation: unknown, Dimensions: 64x224x224->64
+Execution: 1s warmup + 0s silent + 5s benchmark = 6s total
+
+Model input rank: 4
+Input: Random initialized
+Using 2 input tensors (for Add/Mul operations)
+Starting execution...
+Phase 1: Warmup (1 seconds)...
+ERROR: Failed during warmup: Got invalid dimensions for input: input_1 for the following indices
+ index: 1 Got: 64 Expected: 128
+ Please fix either th
+block: Failed to parse IDP runner output:
+CPU cluster: all
+==== ONNX MODEL BENCHMARK ====
+Model: BF_convtrans_concat_block.onnx
+Provider: CPU
+Operation: unknown, Dimensions: 64x224x224->64
+Execution: 1s warmup + 0s silent + 5s benchmark = 6s total
+
+Model input rank: 4
+Input: Random initialized
+Using 2 input tensors (for Add/Mul operations)
+Starting execution...
+Phase 1: Warmup (1 seconds)...
+ERROR: Failed during warmup: Got invalid dimensions for input: input_1 for the following indices
+ index: 1 Got: 64 Expected: 128
+ Please fix either
+block: Failed to parse IDP runner output:
+CPU cluster: all
+==== ONNX MODEL BENCHMARK ====
+Model: BF_fc_add_block.onnx
+Provider: CPU
+Operation: unknown, Dimensions: 64x224x224->64
+Execution: 1s warmup + 0s silent + 5s benchmark = 6s total
+
+Model input rank: 2
+Input: Random initialized
+Using 2 input tensors (for Add/Mul operations)
+Starting execution...
+Phase 1: Warmup (1 seconds)...
+ERROR: Failed during warmup: Got invalid dimensions for input: input_1 for the following indices
+ index: 1 Got: 428 Expected: 128
+ Please fix either the inpu
+block: Failed to parse IDP runner output:
+CPU cluster: all
+==== ONNX MODEL BENCHMARK ====
+Model: BF_fc_concat_block.onnx
+Provider: CPU
+Operation: unknown, Dimensions: 64x224x224->64
+Execution: 1s warmup + 0s silent + 5s benchmark = 6s total
+
+Model input rank: 2
+Input: Random initialized
+Using 2 input tensors (for Add/Mul operations)
+Starting execution...
+Phase 1: Warmup (1 seconds)...
+ERROR: Failed during warmup: Got invalid dimensions for input: input_1 for the following indices
+ index: 1 Got: 428 Expected: 128
+ Please fix either the i
+block: Failed to parse IDP runner output:
+CPU cluster: all
+==== ONNX MODEL BENCHMARK ====
+Model: BF_reshape_add_block.onnx
+Provider: CPU
+Operation: unknown, Dimensions: 64x224x224->64
+Execution: 1s warmup + 0s silent + 5s benchmark = 6s total
+
+Model input rank: 4
+Input: Random initialized
+Using 2 input tensors (for Add/Mul operations)
+Starting execution...
+Phase 1: Warmup (1 seconds)...
+ERROR: Failed during warmup: Got invalid dimensions for input: input_1 for the following indices
+ index: 1 Got: 64 Expected: 28
+ index: 3 Got: 28 Expect
+block: Failed to parse IDP runner output:
+CPU cluster: all
+==== ONNX MODEL BENCHMARK ====
+Model: BF_reshape_concat_block.onnx
+Provider: CPU
+Operation: unknown, Dimensions: 64x224x224->64
+Execution: 1s warmup + 0s silent + 5s benchmark = 6s total
+
+Model input rank: 4
+Input: Random initialized
+Using 2 input tensors (for Add/Mul operations)
+Starting execution...
+Phase 1: Warmup (1 seconds)...
+ERROR: Failed during warmup: Got invalid dimensions for input: input_1 for the following indices
+ index: 1 Got: 64 Expected: 28
+ index: 3 Got: 28 Exp
+block: Command '['adb', '-s', '56040DLAQ004TS', 'push', 'C:\\repo\\energy-estimation\\IDP\\device_runner\\run_onnx_arm64', '/data/local/tmp/onnx_benchmark/run_onnx_arm64']' returned non-zero exit status 1.
+block: Command '['adb', '-s', '56040DLAQ004TS', 'push', 'C:\\repo\\energy-estimation\\IDP\\device_runner\\run_onnx_arm64', '/data/local/tmp/onnx_benchmark/run_onnx_arm64']' returned non-zero exit status 1.
+block: Command '['adb', '-s', '56040DLAQ004TS', 'push', 'C:\\repo\\energy-estimation\\IDP\\device_runner\\run_onnx_arm64', '/data/local/tmp/onnx_benchmark/run_onnx_arm64']' returned non-zero exit status 1.
+block: Command '['adb', '-s', '56040DLAQ004TS', 'push', 'C:\\repo\\energy-estimation\\IDP\\device_runner\\run_onnx_arm64', '/data/local/tmp/onnx_benchmark/run_onnx_arm64']' returned non-zero exit status 1.
+block: Command '['adb', '-s', '56040DLAQ004TS', 'push', 'C:\\repo\\energy-estimation\\IDP\\device_runner\\run_onnx_arm64', '/data/local/tmp/onnx_benchmark/run_onnx_arm64']' returned non-zero exit status 1.
+block: Command '['adb', '-s', '56040DLAQ004TS', 'push', 'C:\\repo\\energy-estimation\\IDP\\device_runner\\run_onnx_arm64', '/data/local/tmp/onnx_benchmark/run_onnx_arm64']' returned non-zero exit status 1.
+block: Command '['adb', '-s', '56040DLAQ004TS', 'push', 'C:\\repo\\energy-estimation\\IDP\\device_runner\\run_onnx_arm64', '/data/local/tmp/onnx_benchmark/run_onnx_arm64']' returned non-zero exit status 1.
+block: Command '['adb', '-s', '56040DLAQ004TS', 'push', 'C:\\repo\\energy-estimation\\IDP\\device_runner\\run_onnx_arm64', '/data/local/tmp/onnx_benchmark/run_onnx_arm64']' returned non-zero exit status 1.
+block: Command '['adb', '-s', '56040DLAQ004TS', 'push', 'C:\\repo\\energy-estimation\\IDP\\device_runner\\run_onnx_arm64', '/data/local/tmp/onnx_benchmark/run_onnx_arm64']' returned non-zero exit status 1.
+block: Command '['adb', '-s', '56040DLAQ004TS', 'push', 'C:\\repo\\energy-estimation\\IDP\\device_runner\\run_onnx_arm64', '/data/local/tmp/onnx_benchmark/run_onnx_arm64']' returned non-zero exit status 1.
+block: Command '['adb', '-s', '56040DLAQ004TS', 'push', 'C:\\repo\\energy-estimation\\IDP\\device_runner\\run_onnx_arm64', '/data/local/tmp/onnx_benchmark/run_onnx_arm64']' returned non-zero exit status 1.
+block: Command '['adb', '-s', '56040DLAQ004TS', 'push', 'C:\\repo\\energy-estimation\\IDP\\device_runner\\run_onnx_arm64', '/data/local/tmp/onnx_benchmark/run_onnx_arm64']' returned non-zero exit status 1.
+block: Command '['adb', '-s', '56040DLAQ004TS', 'push', 'C:\\repo\\energy-estimation\\IDP\\device_runner\\run_onnx_arm64', '/data/local/tmp/onnx_benchmark/run_onnx_arm64']' returned non-zero exit status 1.
+block: Command '['adb', '-s', '56040DLAQ004TS', 'push', 'C:\\repo\\energy-estimation\\IDP\\device_runner\\run_onnx_arm64', '/data/local/tmp/onnx_benchmark/run_onnx_arm64']' returned non-zero exit status 1.
+block: Command '['adb', '-s', '56040DLAQ004TS', 'push', 'C:\\repo\\energy-estimation\\IDP\\device_runner\\run_onnx_arm64', '/data/local/tmp/onnx_benchmark/run_onnx_arm64']' returned non-zero exit status 1.
+block: Command '['adb', '-s', '56040DLAQ004TS', 'push', 'C:\\repo\\energy-estimation\\IDP\\device_runner\\run_onnx_arm64', '/data/local/tmp/onnx_benchmark/run_onnx_arm64']' returned non-zero exit status 1.
+block: Command '['adb', '-s', '56040DLAQ004TS', 'push', 'C:\\repo\\energy-estimation\\IDP\\device_runner\\run_onnx_arm64', '/data/local/tmp/onnx_benchmark/run_onnx_arm64']' returned non-zero exit status 1.
+block: Command '['adb', '-s', '56040DLAQ004TS', 'push', 'C:\\repo\\energy-estimation\\IDP\\device_runner\\run_onnx_arm64', '/data/local/tmp/onnx_benchmark/run_onnx_arm64']' returned non-zero exit status 1.
+block: Command '['adb', '-s', '56040DLAQ004TS', 'push', 'C:\\repo\\energy-estimation\\IDP\\device_runner\\run_onnx_arm64', '/data/local/tmp/onnx_benchmark/run_onnx_arm64']' returned non-zero exit status 1.
+block: Command '['adb', '-s', '56040DLAQ004TS', 'push', 'C:\\repo\\energy-estimation\\IDP\\device_runner\\run_onnx_arm64', '/data/local/tmp/onnx_benchmark/run_onnx_arm64']' returned non-zero exit status 1.
+block: Command '['adb', '-s', '56040DLAQ004TS', 'push', 'C:\\repo\\energy-estimation\\IDP\\device_runner\\run_onnx_arm64', '/data/local/tmp/onnx_benchmark/run_onnx_arm64']' returned non-zero exit status 1.
+block: Command '['adb', '-s', '56040DLAQ004TS', 'push', 'C:\\repo\\energy-estimation\\IDP\\device_runner\\run_onnx_arm64', '/data/local/tmp/onnx_benchmark/run_onnx_arm64']' returned non-zero exit status 1.
+block: Command '['adb', '-s', '56040DLAQ004TS', 'push', 'C:\\repo\\energy-estimation\\IDP\\device_runner\\run_onnx_arm64', '/data/local/tmp/onnx_benchmark/run_onnx_arm64']' returned non-zero exit status 1.
+block: Command '['adb', '-s', '56040DLAQ004TS', 'push', 'C:\\repo\\energy-estimation\\IDP\\device_runner\\run_onnx_arm64', '/data/local/tmp/onnx_benchmark/run_onnx_arm64']' returned non-zero exit status 1.
+block: Command '['adb', '-s', '56040DLAQ004TS', 'push', 'C:\\repo\\energy-estimation\\IDP\\device_runner\\run_onnx_arm64', '/data/local/tmp/onnx_benchmark/run_onnx_arm64']' returned non-zero exit status 1.
+block: Command '['adb', '-s', '56040DLAQ004TS', 'push', 'C:\\repo\\energy-estimation\\IDP\\device_runner\\run_onnx_arm64', '/data/local/tmp/onnx_benchmark/run_onnx_arm64']' returned non-zero exit status 1.
+block: Command '['adb', '-s', '56040DLAQ004TS', 'push', 'C:\\repo\\energy-estimation\\IDP\\device_runner\\run_onnx_arm64', '/data/local/tmp/onnx_benchmark/run_onnx_arm64']' returned non-zero exit status 1.
+block: Command '['adb', '-s', '56040DLAQ004TS', 'push', 'C:\\repo\\energy-estimation\\IDP\\device_runner\\run_onnx_arm64', '/data/local/tmp/onnx_benchmark/run_onnx_arm64']' returned non-zero exit status 1.
+block: Failed to parse IDP runner output:
+CPU cluster: all
+==== ONNX MODEL BENCHMARK ====
+Model: BF_add_add_block.onnx
+Provider: CPU
+Operation: unknown, Dimensions: 64x224x224->64
+Execution: 1s warmup + 0s silent + 5s benchmark = 6s total
+
+Model input rank: 4
+Input: Random initialized
+Using 2 input tensors (for Add/Mul operations)
+Starting execution...
+Phase 1: Warmup (1 seconds)...
+ERROR: Failed during warmup: Non-zero status code returned while running Add node. Name:'Add_1' Status Message: /onnxruntime_src/include/onnxruntime/core/fr
+block: Failed to parse IDP runner output:
+CPU cluster: all
+==== ONNX MODEL BENCHMARK ====
+Model: BF_add_concat_block.onnx
+Provider: CPU
+Operation: unknown, Dimensions: 64x224x224->64
+Execution: 1s warmup + 0s silent + 5s benchmark = 6s total
+
+Model input rank: 4
+Input: Random initialized
+Using 2 input tensors (for Add/Mul operations)
+Starting execution...
+Phase 1: Warmup (1 seconds)...
+ERROR: Failed during warmup: Non-zero status code returned while running Concat node. Name:'Concat_1' Status Message: /onnxruntime_src/include/onnxruntim
+block: Failed to parse IDP runner output:
+CPU cluster: all
+==== ONNX MODEL BENCHMARK ====
+Model: BF_avgpool_add_block.onnx
+Provider: CPU
+Operation: unknown, Dimensions: 64x224x224->64
+Execution: 1s warmup + 0s silent + 5s benchmark = 6s total
+
+Model input rank: 4
+Input: Random initialized
+Using 2 input tensors (for Add/Mul operations)
+Starting execution...
+Phase 1: Warmup (1 seconds)...
+ERROR: Failed during warmup: Got invalid dimensions for input: input_1 for the following indices
+ index: 2 Got: 28 Expected: 14
+ index: 3 Got: 28 Expect
+block: Failed to parse IDP runner output:
+CPU cluster: all
+==== ONNX MODEL BENCHMARK ====
+Model: BF_avgpool_concat_block.onnx
+Provider: CPU
+Operation: unknown, Dimensions: 64x224x224->64
+Execution: 1s warmup + 0s silent + 5s benchmark = 6s total
+
+Model input rank: 4
+Input: Random initialized
+Using 2 input tensors (for Add/Mul operations)
+Starting execution...
+Phase 1: Warmup (1 seconds)...
+ERROR: Failed during warmup: Got invalid dimensions for input: input_1 for the following indices
+ index: 2 Got: 28 Expected: 14
+ index: 3 Got: 28 Exp
+block: Failed to parse IDP runner output:
+CPU cluster: all
+==== ONNX MODEL BENCHMARK ====
+Model: BF_concat_add_block.onnx
+Provider: CPU
+Operation: unknown, Dimensions: 64x224x224->64
+Execution: 1s warmup + 0s silent + 5s benchmark = 6s total
+
+Model input rank: 4
+Input: Random initialized
+Using 2 input tensors (for Add/Mul operations)
+Starting execution...
+Phase 1: Warmup (1 seconds)...
+ERROR: Failed during warmup: Non-zero status code returned while running Add node. Name:'Add_1' Status Message: /onnxruntime_src/include/onnxruntime/core
+block: Failed to parse IDP runner output:
+CPU cluster: all
+==== ONNX MODEL BENCHMARK ====
+Model: BF_concat_concat_block.onnx
+Provider: CPU
+Operation: unknown, Dimensions: 64x224x224->64
+Execution: 1s warmup + 0s silent + 5s benchmark = 6s total
+
+Model input rank: 4
+Input: Random initialized
+Using 2 input tensors (for Add/Mul operations)
+Starting execution...
+Phase 1: Warmup (1 seconds)...
+ERROR: Failed during warmup: Non-zero status code returned while running Concat node. Name:'Concat_1' Status Message: /onnxruntime_src/include/onnxrun
+block: Failed to parse IDP runner output:
+CPU cluster: all
+==== ONNX MODEL BENCHMARK ====
+Model: BF_conv_add_block.onnx
+Provider: CPU
+Operation: unknown, Dimensions: 64x224x224->64
+Execution: 1s warmup + 0s silent + 5s benchmark = 6s total
+
+Model input rank: 4
+Input: Random initialized
+Using 2 input tensors (for Add/Mul operations)
+Starting execution...
+Phase 1: Warmup (1 seconds)...
+ERROR: Failed during warmup: Got invalid dimensions for input: input_1 for the following indices
+ index: 1 Got: 64 Expected: 128
+ Please fix either the inp
+block: Failed to parse IDP runner output:
+CPU cluster: all
+==== ONNX MODEL BENCHMARK ====
+Model: BF_conv_concat_block.onnx
+Provider: CPU
+Operation: unknown, Dimensions: 64x224x224->64
+Execution: 1s warmup + 0s silent + 5s benchmark = 6s total
+
+Model input rank: 4
+Input: Random initialized
+Using 2 input tensors (for Add/Mul operations)
+Starting execution...
+Phase 1: Warmup (1 seconds)...
+ERROR: Failed during warmup: Got invalid dimensions for input: input_1 for the following indices
+ index: 1 Got: 64 Expected: 128
+ Please fix either the 
+block: Failed to parse IDP runner output:
+CPU cluster: all
+==== ONNX MODEL BENCHMARK ====
+Model: BF_convtrans_add_block.onnx
+Provider: CPU
+Operation: unknown, Dimensions: 64x224x224->64
+Execution: 1s warmup + 0s silent + 5s benchmark = 6s total
+
+Model input rank: 4
+Input: Random initialized
+Using 2 input tensors (for Add/Mul operations)
+Starting execution...
+Phase 1: Warmup (1 seconds)...
+ERROR: Failed during warmup: Got invalid dimensions for input: input_1 for the following indices
+ index: 1 Got: 64 Expected: 128
+ Please fix either th
+block: Failed to parse IDP runner output:
+CPU cluster: all
+==== ONNX MODEL BENCHMARK ====
+Model: BF_convtrans_concat_block.onnx
+Provider: CPU
+Operation: unknown, Dimensions: 64x224x224->64
+Execution: 1s warmup + 0s silent + 5s benchmark = 6s total
+
+Model input rank: 4
+Input: Random initialized
+Using 2 input tensors (for Add/Mul operations)
+Starting execution...
+Phase 1: Warmup (1 seconds)...
+ERROR: Failed during warmup: Got invalid dimensions for input: input_1 for the following indices
+ index: 1 Got: 64 Expected: 128
+ Please fix either
+block: Failed to parse IDP runner output:
+CPU cluster: all
+==== ONNX MODEL BENCHMARK ====
+Model: BF_fc_add_block.onnx
+Provider: CPU
+Operation: unknown, Dimensions: 64x224x224->64
+Execution: 1s warmup + 0s silent + 5s benchmark = 6s total
+
+Model input rank: 2
+Input: Random initialized
+Using 2 input tensors (for Add/Mul operations)
+Starting execution...
+Phase 1: Warmup (1 seconds)...
+ERROR: Failed during warmup: Got invalid dimensions for input: input_1 for the following indices
+ index: 1 Got: 428 Expected: 128
+ Please fix either the inpu
+block: Failed to parse IDP runner output:
+CPU cluster: all
+==== ONNX MODEL BENCHMARK ====
+Model: BF_fc_concat_block.onnx
+Provider: CPU
+Operation: unknown, Dimensions: 64x224x224->64
+Execution: 1s warmup + 0s silent + 5s benchmark = 6s total
+
+Model input rank: 2
+Input: Random initialized
+Using 2 input tensors (for Add/Mul operations)
+Starting execution...
+Phase 1: Warmup (1 seconds)...
+ERROR: Failed during warmup: Got invalid dimensions for input: input_1 for the following indices
+ index: 1 Got: 428 Expected: 128
+ Please fix either the i
+block: Failed to parse IDP runner output:
+CPU cluster: all
+==== ONNX MODEL BENCHMARK ====
+Model: BF_reshape_add_block.onnx
+Provider: CPU
+Operation: unknown, Dimensions: 64x224x224->64
+Execution: 1s warmup + 0s silent + 5s benchmark = 6s total
+
+Model input rank: 4
+Input: Random initialized
+Using 2 input tensors (for Add/Mul operations)
+Starting execution...
+Phase 1: Warmup (1 seconds)...
+ERROR: Failed during warmup: Got invalid dimensions for input: input_1 for the following indices
+ index: 1 Got: 64 Expected: 28
+ index: 3 Got: 28 Expect
+block: Failed to parse IDP runner output:
+CPU cluster: all
+==== ONNX MODEL BENCHMARK ====
+Model: BF_reshape_concat_block.onnx
+Provider: CPU
+Operation: unknown, Dimensions: 64x224x224->64
+Execution: 1s warmup + 0s silent + 5s benchmark = 6s total
+
+Model input rank: 4
+Input: Random initialized
+Using 2 input tensors (for Add/Mul operations)
+Starting execution...
+Phase 1: Warmup (1 seconds)...
+ERROR: Failed during warmup: Got invalid dimensions for input: input_1 for the following indices
+ index: 1 Got: 64 Expected: 28
+ index: 3 Got: 28 Exp

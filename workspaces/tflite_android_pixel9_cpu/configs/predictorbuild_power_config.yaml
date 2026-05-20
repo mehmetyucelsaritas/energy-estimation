@@ -1,0 +1,10 @@
+DETAIL: FALSE
+IMPLEMENT: torch
+BATCH_SIZE: 1
+KERNELS:
+  # Energy predictor sampling config (label: mjperinf from Perfetto)
+  maxpool:
+    INIT_SAMPLE_NUM: 100
+    FINEGRAINED_SAMPLE_NUM: 20
+    ITERATION: 1
+    ERROR_THRESHOLD: 0.1

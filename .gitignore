@@ -58,3 +58,4 @@ experiments/*
 **/predictor_build/*
 **/testcases/*
 workspaces/tflite_android/benchmark_model_cpu_gpu_v2.7.tflite
+workspaces/tflite_android_pixel9_cpu/benchmark_model_cpu_gpu_v2.7

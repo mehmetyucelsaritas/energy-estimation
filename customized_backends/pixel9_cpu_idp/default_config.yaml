@@ -1,0 +1,40 @@
+# Pixel 9 CPU backend using IDP device runner and battery sysfs polling.
+
+# ADB target (leave empty if only one device is connected)
+DEVICE_SERIAL: "56040DLAQ004TS"
+
+# Device-side paths
+DEVICE_DIR: "/data/local/tmp/onnx_benchmark"
+REMOTE_MODEL_DIR: "/data/local/tmp/onnx_benchmark/models"
+
+# Local runner bundle (relative to repo root by default)
+RUNNER_BINARY_PATH: "IDP/device_runner/run_onnx_arm64"
+RUNNER_LIB_ORT_PATH: "IDP/device_runner/ort_android/jni/arm64-v8a/libonnxruntime.so"
+RUNNER_LIB_CPP_PATH: "IDP/device_runner/ort_android/jni/arm64-v8a/libc++_shared.so"
+
+# Runtime mode
+PROVIDER: "cpu"            # cpu | nnapi
+CPU_CLUSTER: "all"         # all | little | mid | big
+
+# Measurement timing in seconds
+WARMUP_S: 1
+SILENCE_S: 0
+MEASUREMENT_S: 5
+COOLDOWN_S: 0
+
+# Perfetto settings
+PERFETTO_BUFFER_KB: 262144
+PERFETTO_BATTERY_POLL_MS: 250
+TRACE_PROCESSOR_PATH: "IDP/trace_processor"
+POWER_RAILS:
+  - "power.rails.cpu.little"
+  - "power.rails.cpu.mid"
+  - "power.rails.cpu.big"
+  - "power.rails.cpu.mid.mem"
+  - "power.rails.ddr.a"
+  - "power.rails.ddr.b"
+  - "power.rails.ddr.c"
+  - "power.rails.memory.interface"
+  - "power.rails.system.fabric"
+  - "power.rails.gpu"
+  - "power.rails.tpu"

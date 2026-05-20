@@ -1,0 +1,5 @@
+builtin_name: pixel9_cpu_idp
+package_location: C:/repo/energy-estimation/customized_backends/pixel9_cpu_idp
+class_module: backend
+class_name: Pixel9CPUIDPBackend
+defaultConfigFile: C:/repo/energy-estimation/customized_backends/pixel9_cpu_idp/default_config.yaml
