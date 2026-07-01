@@ -59,3 +59,17 @@ experiments/*
 **/testcases/*
 workspaces/tflite_android/benchmark_model_cpu_gpu_v2.7.tflite
 workspaces/tflite_android_pixel9_cpu/benchmark_model_cpu_gpu_v2.7
+material/datasets/alexnets.jsonl
+material/datasets/densenets.jsonl
+material/datasets/googlenets.jsonl
+material/datasets/mnasnets.jsonl
+material/datasets/mobilenetv1s.jsonl
+material/datasets/mobilenetv2s.jsonl
+material/datasets/mobilenetv3s.jsonl
+material/datasets/nasbench201s.jsonl
+material/datasets/proxylessnass.jsonl
+material/datasets/resnets.jsonl
+material/datasets/shufflenetv2s.jsonl
+material/datasets/squeezenets.jsonl
+material/datasets/vggs.jsonl
+JVET - Mehmet Contribution/*
