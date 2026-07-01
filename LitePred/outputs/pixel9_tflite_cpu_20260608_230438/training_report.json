@@ -1,0 +1,166 @@
+{
+  "platform": "Pixel 9 CPU",
+  "device_serial": "56040DLAQ004TS",
+  "device_model": "Pixel 9",
+  "android_release": "16",
+  "framework": "TFLite (benchmark_model on CPU, XNNPACK delegate)",
+  "benchmark_path": "/data/local/tmp/benchmark_model",
+  "remote_model_dir": "/sdcard",
+  "taskset": "60",
+  "predictor_pool": "/Users/mehmet/repo/Energy-Estimation/nn-Meter-main/LitePred/predictors/pool",
+  "training": {
+    "epochs": 350,
+    "batch_size": 32,
+    "learning_rate": 0.001,
+    "test_size": 0.2,
+    "seed": 10,
+    "warm_ups": 30,
+    "num_runs": 40
+  },
+  "sample_counts_requested": {
+    "conv-bn-relu": 600,
+    "fc": 200,
+    "avgpool": 200,
+    "maxpool": 200
+  },
+  "kernels": {
+    "conv-bn-relu": {
+      "kernel_type": "conv-bn-relu",
+      "num_samples_total": 600,
+      "num_train": 480,
+      "num_eval": 120,
+      "transfer_device": "xiaomi12tf21cpu_to_pixel6tf21cpu",
+      "train_metrics": {
+        "rmse": 124.78026870452186,
+        "rmspe": 5.668285641159107,
+        "relative_error": 1.2252138484344939,
+        "acc5": 0.7708333333333334,
+        "acc10": 0.9166666666666666,
+        "acc15": 0.9645833333333333
+      },
+      "eval_metrics": {
+        "rmse": 128.5322920470762,
+        "rmspe": 10.696235412337234,
+        "relative_error": 0.8929975213319261,
+        "acc5": 0.625,
+        "acc10": 0.8083333333333333,
+        "acc15": 0.8833333333333333
+      },
+      "predictor_path": "LitePred/outputs/pixel9_tflite_cpu_20260608_230438/predictors/conv-bn-relu.pth",
+      "dataset_path": "LitePred/outputs/pixel9_tflite_cpu_20260608_230438/datasets/Data_conv-bn-relu_litepred.csv",
+      "profiling": {
+        "configs_sampled": 600,
+        "models_generated": 600,
+        "models_profiled": 600,
+        "generation_failures": 0,
+        "profiling_failures": 0
+      }
+    },
+    "fc": {
+      "kernel_type": "fc",
+      "num_samples_total": 200,
+      "num_train": 160,
+      "num_eval": 40,
+      "transfer_device": "pixel5tf27cpu_to_xiaomi12tf27cpu",
+      "train_metrics": {
+        "rmse": 0.13818404014734298,
+        "rmspe": 4.911759288845033,
+        "relative_error": 0.1334838815083058,
+        "acc5": 0.86875,
+        "acc10": 0.94375,
+        "acc15": 0.96875
+      },
+      "eval_metrics": {
+        "rmse": 0.05585358129672691,
+        "rmspe": 2.6636328001971235,
+        "relative_error": 0.06311221307885514,
+        "acc5": 0.925,
+        "acc10": 1.0,
+        "acc15": 1.0
+      },
+      "predictor_path": "LitePred/outputs/pixel9_tflite_cpu_20260608_230438/predictors/fc.pth",
+      "dataset_path": "LitePred/outputs/pixel9_tflite_cpu_20260608_230438/datasets/Data_fc_litepred.csv",
+      "profiling": {
+        "configs_sampled": 200,
+        "models_generated": 200,
+        "models_profiled": 200,
+        "generation_failures": 0,
+        "profiling_failures": 0
+      }
+    },
+    "avgpool": {
+      "kernel_type": "avgpool",
+      "num_samples_total": 200,
+      "num_train": 160,
+      "num_eval": 40,
+      "transfer_device": "pixel5tf27cpu_to_xiaomi12tf27cpu",
+      "train_metrics": {
+        "rmse": 0.06796666986960948,
+        "rmspe": 6.175352361095173,
+        "relative_error": 0.10040385643361198,
+        "acc5": 0.75,
+        "acc10": 0.9,
+        "acc15": 0.95625
+      },
+      "eval_metrics": {
+        "rmse": 0.05526116690705928,
+        "rmspe": 12.400121529873994,
+        "relative_error": 0.12981265103897494,
+        "acc5": 0.375,
+        "acc10": 0.65,
+        "acc15": 0.85
+      },
+      "predictor_path": "LitePred/outputs/pixel9_tflite_cpu_20260608_230438/predictors/avgpool.pth",
+      "dataset_path": "LitePred/outputs/pixel9_tflite_cpu_20260608_230438/datasets/Data_avgpool_litepred.csv",
+      "profiling": {
+        "configs_sampled": 200,
+        "models_generated": 200,
+        "models_profiled": 200,
+        "generation_failures": 0,
+        "profiling_failures": 0
+      }
+    },
+    "maxpool": {
+      "kernel_type": "maxpool",
+      "num_samples_total": 200,
+      "num_train": 160,
+      "num_eval": 40,
+      "transfer_device": "pixel5tf27cpu_to_xiaomi12tf27cpu",
+      "train_metrics": {
+        "rmse": 0.11364065221981576,
+        "rmspe": 11.317061432720333,
+        "relative_error": 0.1756018654594628,
+        "acc5": 0.59375,
+        "acc10": 0.76875,
+        "acc15": 0.88125
+      },
+      "eval_metrics": {
+        "rmse": 0.1011393294151519,
+        "rmspe": 14.179758727574038,
+        "relative_error": 0.24260503065687805,
+        "acc5": 0.3,
+        "acc10": 0.575,
+        "acc15": 0.775
+      },
+      "predictor_path": "LitePred/outputs/pixel9_tflite_cpu_20260608_230438/predictors/maxpool.pth",
+      "dataset_path": "LitePred/outputs/pixel9_tflite_cpu_20260608_230438/datasets/Data_maxpool_litepred.csv",
+      "profiling": {
+        "configs_sampled": 200,
+        "models_generated": 200,
+        "models_profiled": 200,
+        "generation_failures": 0,
+        "profiling_failures": 0
+      }
+    }
+  },
+  "assumptions": [
+    "LitePred MLP transfer-learning pipeline is used (Detector + Trainer).",
+    "Kernel TFLite models are generated with nn-Meter TensorFlow kernel blocks because LitePred does not ship a standalone model generator.",
+    "On-device profiling uses LitePred/profile_script with non-root adb shell (Pixel 9 has no su).",
+    "CPU inference is pinned with taskset mask 60 and --num_threads=1.",
+    "Latency label is benchmark_model avg inference time in milliseconds.",
+    "Train/validation split uses sklearn train_test_split(test_size=0.2, random_state=10)."
+  ],
+  "started_at": "20260608_230438",
+  "elapsed_seconds": 6922.66
+}
