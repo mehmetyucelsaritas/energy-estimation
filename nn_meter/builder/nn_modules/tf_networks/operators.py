@@ -42,6 +42,33 @@ class DwConv(BaseOperator):
         return [output_h, output_w, self.input_shape[2]]
 
 
+class SeparableDwConv(BaseOperator):
+    """One separable depthwise leg (e.g. NN_Filtering 3x1 or 1x3 grouped Conv)."""
+
+    def _kernel_size(self):
+        kh = self.config.get("KERNEL_H", self.config.get("KERNEL_SIZE", 3))
+        kw = self.config.get("KERNEL_W", kh)
+        return (kh, kw)
+
+    def _strides(self):
+        sh = self.config.get("STRIDE_H", self.config.get("STRIDES", 1))
+        sw = self.config.get("STRIDE_W", sh)
+        return (sh, sw)
+
+    def get_model(self):
+        return keras.layers.DepthwiseConv2D(
+            kernel_size=self._kernel_size(),
+            strides=self._strides(),
+            padding="same",
+        )
+
+    def get_output_shape(self):
+        sh, sw = self._strides()
+        output_h = (self.input_shape[0] - 1) // sh + 1
+        output_w = (self.input_shape[1] - 1) // sw + 1
+        return [output_h, output_w, self.input_shape[2]]
+
+
 class ConvTrans(BaseOperator):
     def get_model(self):
         cout = self.input_shape[2] if "COUT" not in self.config else self.config["COUT"]

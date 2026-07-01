@@ -65,6 +65,66 @@ __PREDICTOR_ZOO__ = {
             "random_state": 10,
         }
     },
+    "separable-dwconv-bn-relu": {
+        "tflite_cpu": {
+            "max_depth": 50,
+            "n_estimators": 240,
+            "min_samples_leaf": 1,
+            "min_samples_split": 2,
+            "max_features": 8,
+            "oob_score": True,
+            "random_state": 10,
+        },
+        "tflite_gpu": {
+            "max_depth": 40,
+            "n_estimators": 240,
+            "min_samples_leaf": 1,
+            "min_samples_split": 2,
+            "max_features": 8,
+            "oob_score": True,
+            "random_state": 10,
+        },
+        "openvino_vpu": {
+            "max_depth": 100,
+            "n_estimators": 650,
+            "min_samples_leaf": 1,
+            "min_samples_split": 2,
+            "max_features": 8,
+            "oob_score": True,
+            "n_jobs": 32,
+            "random_state": 10,
+        }
+    },
+    "separable-dwconv-block": {
+        "tflite_cpu": {
+            "max_depth": 50,
+            "n_estimators": 240,
+            "min_samples_leaf": 1,
+            "min_samples_split": 2,
+            "max_features": 8,
+            "oob_score": True,
+            "random_state": 10,
+        },
+        "tflite_gpu": {
+            "max_depth": 40,
+            "n_estimators": 240,
+            "min_samples_leaf": 1,
+            "min_samples_split": 2,
+            "max_features": 8,
+            "oob_score": True,
+            "random_state": 10,
+        },
+        "openvino_vpu": {
+            "max_depth": 100,
+            "n_estimators": 650,
+            "min_samples_leaf": 1,
+            "min_samples_split": 2,
+            "max_features": 8,
+            "oob_score": True,
+            "n_jobs": 32,
+            "random_state": 10,
+        }
+    },
     "fc": {
         "tflite_cpu": {
             "max_depth": 50,

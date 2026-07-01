@@ -27,6 +27,9 @@ __BUILTIN_KERNELS__ = {
     "dwconv-bn-relu6": ["DwConvBnRelu6", "DwConvSampler"],
     "dwconv-block": ["DwConvBlock", "DwConvSampler"],
     "dwconv-bn-hswish": ["DwConvBnHswish", "DwConvSampler"],
+    # separable depthwise (NN_Filtering 3x1 / 1x3 legs)
+    "separable-dwconv-block": ["SeparableDwConvBlock", "SeparableDwConvSampler"],
+    "separable-dwconv-bn-relu": ["SeparableDwConvBnRelu", "SeparableDwConvSampler"],
     # others
     "maxpool": ["MaxPoolBlock", "PoolingSampler"],
     "avgpool": ["AvgPoolBlock", "PoolingSampler"],

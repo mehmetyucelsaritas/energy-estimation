@@ -64,6 +64,25 @@ def finegrained_sampling_dwconv(cfgs, count):
     return ncfgs
 
 
+def finegrained_sampling_separable_dwconv(cfgs, count):
+    '''Fine-grained sampling for separable dwconv kernels.'''
+    ncfgs = []
+    for cfg in cfgs:
+        cins = sample_in_range(int(cfg["CIN"] * 0.5), int(cfg["CIN"] * 1.2), count)
+        for cin in cins:
+            ncfgs.append({
+                "INPUT_H": cfg["INPUT_H"],
+                "INPUT_W": cfg["INPUT_W"],
+                "HW": cfg.get("HW", max(cfg["INPUT_H"], cfg["INPUT_W"])),
+                "CIN": cin,
+                "KERNEL_H": cfg["KERNEL_H"],
+                "KERNEL_W": cfg["KERNEL_W"],
+                "STRIDE_H": cfg["STRIDE_H"],
+                "STRIDE_W": cfg["STRIDE_W"],
+            })
+    return ncfgs
+
+
 def finegrained_sampling_fc(cfgs, count):
     '''
     Sampling configs for fc kernels

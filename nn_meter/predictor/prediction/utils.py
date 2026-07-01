@@ -9,7 +9,9 @@ def get_kernel_name(optype):
     """
     if "conv" in optype and "dwconv" not in optype:
         optype = "conv-bn-relu"
-    if "dwconv" in optype:
+    if "separable-dwconv" in optype:
+        optype = "separable-dwconv-block"
+    elif "dwconv" in optype:
         optype = "dwconv-bn-relu"
     if optype == "fc-relu":
         optype = "fc"

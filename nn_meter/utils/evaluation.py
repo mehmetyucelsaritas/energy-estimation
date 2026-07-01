@@ -36,6 +36,15 @@ def get_dwconv_flop_params(hw, cout, kernel_size, stride):
     return flops, params
 
 
+def get_separable_dwconv_flop_params(input_h, input_w, cin, kernel_h, kernel_w, stride_h, stride_w):
+    """FLOPs for one separable depthwise leg (NN_Filtering-style grouped Conv)."""
+    out_h = (input_h - 1) // stride_h + 1
+    out_w = (input_w - 1) // stride_w + 1
+    params = cin * (kernel_h * kernel_w + 1)
+    flops = 2 * out_h * out_w * params
+    return flops, params
+
+
 def get_fc_flop_params(cin, cout):
     params = (2 * cin + 1) * cout
     flops = params

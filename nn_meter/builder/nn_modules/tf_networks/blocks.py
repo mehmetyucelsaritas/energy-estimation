@@ -12,7 +12,9 @@ logging = logging.getLogger("nn-Meter")
 class TFBlock(BaseBlock):
     def __init__(self, config, batch_size = 1):
         self.config = config
-        self.input_shape = [config["HW"], config["HW"], config["CIN"]]
+        input_h = config.get("INPUT_H", config["HW"])
+        input_w = config.get("INPUT_W", config["HW"])
+        self.input_shape = [input_h, input_w, config["CIN"]]
         self.input_tensor_shape = [self.input_shape]
         self.batch_size = batch_size
 
@@ -373,6 +375,34 @@ class DwConvBlock(TFBlock):
 
     def get_model(self):
         return self.build_model([self.dwconv_op])
+
+
+class SeparableDwConvBlock(TFBlock):
+    def __init__(self, config, batch_size=1):
+        super().__init__(config, batch_size)
+
+        sep_op = SeparableDwConv(self.input_shape, config)
+        self.sep_op = sep_op.get_model()
+
+    def get_model(self):
+        return self.build_model([self.sep_op])
+
+
+class SeparableDwConvBnRelu(TFBlock):
+    def __init__(self, config, batch_size=1):
+        super().__init__(config, batch_size)
+
+        sep_op = SeparableDwConv(self.input_shape, config)
+        self.sep_op, out_shape = sep_op.get_model(), sep_op.get_output_shape()
+
+        bn_op = BN(out_shape, config)
+        self.bn_op, out_shape = bn_op.get_model(), bn_op.get_output_shape()
+
+        relu_op = Relu(out_shape, config)
+        self.relu_op = relu_op.get_model()
+
+    def get_model(self):
+        return self.build_model([self.sep_op, self.bn_op, self.relu_op])
 
 
 class ConvBnHswish(TFBlock):

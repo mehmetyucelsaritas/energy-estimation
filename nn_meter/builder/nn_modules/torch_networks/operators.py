@@ -39,6 +39,34 @@ class DwConv(BaseOperator):
         return [cin, output_h, output_w]
 
 
+class SeparableDwConv(BaseOperator):
+    def _kernel_size(self):
+        kh = self.config.get("KERNEL_H", self.config.get("KERNEL_SIZE", 3))
+        kw = self.config.get("KERNEL_W", kh)
+        return (kh, kw)
+
+    def _strides(self):
+        sh = self.config.get("STRIDE_H", self.config.get("STRIDES", 1))
+        sw = self.config.get("STRIDE_W", sh)
+        return (sh, sw)
+
+    def get_model(self):
+        cin = self.input_shape[0]
+        kh, kw = self._kernel_size()
+        sh, sw = self._strides()
+        padding = (kh // 2, kw // 2)
+        return nn.Conv2d(
+            cin, cin, kernel_size=(kh, kw), stride=(sh, sw), padding=padding, groups=cin
+        )
+
+    def get_output_shape(self):
+        cin = self.input_shape[0]
+        sh, sw = self._strides()
+        output_h = (self.input_shape[1] - 1) // sh + 1
+        output_w = (self.input_shape[2] - 1) // sw + 1
+        return [cin, output_h, output_w]
+
+
 class ConvTrans(BaseOperator):
     def get_model(self):
         cin = self.input_shape[0]

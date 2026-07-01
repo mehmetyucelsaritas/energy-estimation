@@ -1,11 +1,20 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 import json
-from nn_meter.utils import get_conv_flop_params, get_dwconv_flop_params, get_fc_flop_params
+from nn_meter.utils import get_conv_flop_params, get_dwconv_flop_params, get_separable_dwconv_flop_params, get_fc_flop_params
 
 
 def get_flops_params(kernel_type, config):
-    if "dwconv" in kernel_type:
+    if "separable-dwconv" in kernel_type:
+        input_h = config["INPUT_H"] if "INPUT_H" in config else config["HW"]
+        input_w = config["INPUT_W"] if "INPUT_W" in config else config["HW"]
+        cin = config["CIN"]
+        kh = config.get("KERNEL_H", config.get("KERNEL_SIZE", 3))
+        kw = config.get("KERNEL_W", kh)
+        sh = config.get("STRIDE_H", config.get("STRIDES", 1))
+        sw = config.get("STRIDE_W", sh)
+        return get_separable_dwconv_flop_params(input_h, input_w, cin, kh, kw, sh, sw)
+    elif "dwconv" in kernel_type:
         hw, cin, kernel_size, stride = config["HW"], config["CIN"], \
             config["KERNEL_SIZE"], config["STRIDES"]
         return get_dwconv_flop_params(hw, cin, kernel_size, stride)

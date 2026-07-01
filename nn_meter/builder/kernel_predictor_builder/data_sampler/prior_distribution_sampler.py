@@ -2,7 +2,7 @@
 # Licensed under the MIT license.
 import random
 import numpy as np
-from nn_meter.utils import get_conv_flop_params, get_dwconv_flop_params, get_fc_flop_params
+from nn_meter.utils import get_conv_flop_params, get_dwconv_flop_params, get_separable_dwconv_flop_params, get_fc_flop_params
 from .prior_config_lib.utils import *
 
 
@@ -171,6 +171,75 @@ def sampling_dwconv(count):
     # the procedure is for better profiling
     ncfgs = [x for x, _ in sorted(zip(ncfgs, nparams), key=lambda x: x[1])]
 
+    return ncfgs
+
+
+def _clone_separable_config(cfg):
+    ih = int(cfg["INPUT_H"])
+    iw = int(cfg["INPUT_W"])
+    return {
+        "INPUT_H": ih,
+        "INPUT_W": iw,
+        "HW": int(cfg.get("HW", max(ih, iw))),
+        "CIN": int(cfg["CIN"]),
+        "KERNEL_H": int(cfg["KERNEL_H"]),
+        "KERNEL_W": int(cfg["KERNEL_W"]),
+        "STRIDE_H": int(cfg["STRIDE_H"]),
+        "STRIDE_W": int(cfg["STRIDE_W"]),
+    }
+
+
+def _variant_separable_config(base, input_hs, input_ws, cins):
+    """Perturb channels/spatial size while preserving leg geometry (kh,kw,sh,sw)."""
+    cfg = _clone_separable_config(base)
+    mode = random.randint(0, 3)
+    if mode >= 1:
+        cfg["CIN"] = random.choice(cins)
+    if mode >= 2:
+        cfg["INPUT_H"] = random.choice(input_hs)
+        cfg["INPUT_W"] = random.choice(input_ws)
+        cfg["HW"] = max(cfg["INPUT_H"], cfg["INPUT_W"])
+    return cfg
+
+
+def sampling_separable_dwconv(count):
+    '''
+    Sampling configs for separable depthwise conv legs from dwconv.csv (kh,kw,sh,sw rows).
+    Returned params: INPUT_H, INPUT_W, CIN, KERNEL_H, KERNEL_W, STRIDE_H, STRIDE_W
+
+  Each sample is a joint leg config (never independent kh/kw). Base configs come from
+  NN_Filtering rows in dwconv.csv; additional samples perturb CIN and spatial dims only.
+    '''
+    configs, input_hs, input_ws, cins, _khs, _kws, _shs, _sws = read_separable_dwconv_prior_configs()
+    if not configs:
+        raise ValueError("No separable dwconv configs found in dwconv.csv (rows with kh,kw,sh,sw)")
+
+    ncfgs = []
+    nparams = []
+    for cfg in configs:
+        c = _clone_separable_config(cfg)
+        ncfgs.append(c)
+        nparams.append(
+            get_separable_dwconv_flop_params(
+                c["INPUT_H"], c["INPUT_W"], c["CIN"],
+                c["KERNEL_H"], c["KERNEL_W"], c["STRIDE_H"], c["STRIDE_W"],
+            )[0]
+        )
+
+    while len(ncfgs) < count:
+        base = random.choice(configs)
+        c = _variant_separable_config(base, input_hs, input_ws, cins)
+        ncfgs.append(c)
+        nparams.append(
+            get_separable_dwconv_flop_params(
+                c["INPUT_H"], c["INPUT_W"], c["CIN"],
+                c["KERNEL_H"], c["KERNEL_W"], c["STRIDE_H"], c["STRIDE_W"],
+            )[0]
+        )
+
+    ncfgs = ncfgs[:count]
+    nparams = nparams[:count]
+    ncfgs = [x for x, _ in sorted(zip(ncfgs, nparams), key=lambda item: item[1])]
     return ncfgs
 
 

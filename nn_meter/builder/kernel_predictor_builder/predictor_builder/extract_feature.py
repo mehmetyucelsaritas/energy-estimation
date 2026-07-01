@@ -30,6 +30,9 @@ feature_for_kernel = {
     "dwconv-block":         ["HW", "CIN", "COUT", "KERNEL_SIZE", "STRIDES"],
     "dwconv-bn-hswish":     ["HW", "CIN", "COUT", "KERNEL_SIZE", "STRIDES"],
     "dwconv-swish":         ["HW", "CIN", "COUT", "KERNEL_SIZE", "STRIDES"],
+    # separable depthwise (NN_Filtering 3x1 / 1x3 legs; COUT == CIN)
+    "separable-dwconv-block": ["INPUT_H", "INPUT_W", "CIN", "COUT", "KERNEL_H", "KERNEL_W", "STRIDE_H", "STRIDE_W"],
+    "separable-dwconv-bn-relu": ["INPUT_H", "INPUT_W", "CIN", "COUT", "KERNEL_H", "KERNEL_W", "STRIDE_H", "STRIDE_W"],
     # pooling ("COUT" will always be the same as "CIN")
     "maxpool":              ["HW", "CIN", "COUT", "KERNEL_SIZE", "POOL_STRIDES"],
     "avgpool":              ["HW", "CIN", "COUT", "KERNEL_SIZE", "POOL_STRIDES"],
@@ -106,7 +109,7 @@ def get_feature_parser(kernel_type):
         parser_module = importlib.import_module(kernel_info["parser_module"])
         return getattr(parser_module, parser_name)(kernel_type)
     elif kernel_type in feature_for_kernel:
-        if "conv" in kernel_type or "dwconv" in kernel_type or "fc" in kernel_type:
+        if "separable-dwconv" in kernel_type or "conv" in kernel_type or "dwconv" in kernel_type or "fc" in kernel_type:
             return FlopsParamParser(kernel_type)
         else:
             return BaseFeatureParser(kernel_type)

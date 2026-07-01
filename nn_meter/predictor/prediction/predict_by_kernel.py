@@ -10,6 +10,8 @@ def merge_conv_kernels(kernelname):
     """
     if "conv" in kernelname and "dwconv" not in kernelname:
         return "conv-bn-relu"
+    elif "separable-dwconv" in kernelname:
+        return "separable-dwconv-block"
     elif "dwconv" in kernelname:
         return "dwconv-bn-relu"
     else:

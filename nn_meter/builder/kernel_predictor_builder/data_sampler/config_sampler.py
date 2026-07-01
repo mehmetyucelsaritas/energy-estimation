@@ -35,6 +35,15 @@ class DwConvSampler(BaseConfigSampler):
         return finegrained_sampling_dwconv(configs, sample_num)
 
 
+class SeparableDwConvSampler(BaseConfigSampler):
+
+    def prior_config_sampling(self, sample_num):
+        return sampling_separable_dwconv(sample_num)
+
+    def finegrained_config_sampling(self, configs, sample_num):
+        return finegrained_sampling_separable_dwconv(configs, sample_num)
+
+
 class PoolingSampler(BaseConfigSampler):
 
     def prior_config_sampling(self, sample_num):
